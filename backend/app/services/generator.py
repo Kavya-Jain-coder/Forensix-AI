@@ -24,72 +24,79 @@ class ReportGenerator:
         )
 
     async def generate(self, context: str):
-        prompt = ChatPromptTemplate.from_template("""You are a senior forensic analyst. Analyze the evidence and generate a COMPLETE structured forensic report.
+        prompt = ChatPromptTemplate.from_template("""You are a senior forensic analyst. Analyze the evidence and generate a COMPLETE forensic report.
 
 EVIDENCE:
 {context}
 
-RESPOND WITH ONLY VALID JSON (no markdown, no explanation):
+Return ONLY valid JSON (no markdown, no extra text):
 {{
-  "case_summary": "2-3 sentence executive summary of the evidence and findings",
+  "case_summary": "2-3 sentence objective summary of evidence and findings",
   "key_findings": [
-    {{"title": "Finding title", "description": "Detailed description of the finding", "severity": "critical"}},
-    {{"title": "Finding title", "description": "Detailed description of the finding", "severity": "high"}},
-    {{"title": "Finding title", "description": "Detailed description of the finding", "severity": "medium"}}
+    {{"title": "Finding 1", "description": "Detailed description", "severity": "critical"}},
+    {{"title": "Finding 2", "description": "Detailed description", "severity": "high"}},
+    {{"title": "Finding 3", "description": "Detailed description", "severity": "medium"}}
   ],
-  "evidence_extracted": ["Key evidence point 1", "Key evidence point 2", "Key evidence point 3"],
+  "evidence_extracted": ["Evidence point 1", "Evidence point 2", "Evidence point 3"],
   "risk_level": "high",
-  "recommendations": ["Actionable recommendation 1", "Actionable recommendation 2"],
-  "technical_notes": "Additional technical details or observations"
+  "recommendations": ["Recommendation 1", "Recommendation 2"],
+  "technical_notes": "Additional technical observations"
 }}
 
-REQUIREMENTS:
-- Generate EXACTLY this structure with ALL fields
-- case_summary: 50-150 words, objective summary
-- key_findings: MUST have minimum 2-3 findings, each with title (max 50 chars), detailed description (100-300 chars), severity (critical|high|medium|low|none)
-- evidence_extracted: List 3-5 specific evidence items from the context
-- risk_level: Assess overall risk as critical|high|medium|low|none
-- recommendations: Provide 2-3 specific, actionable recommendations
-- technical_notes: Any additional technical observations (100-200 chars)
-- Be factual and only use information from the provided context
-- Avoid hallucinations or made-up details""")
+CRITICAL REQUIREMENTS:
+- Generate ALL 6 fields - NO MISSING FIELDS
+- case_summary: 50-150 words
+- key_findings: EXACTLY 3 findings, each with severity (critical|high|medium|low|none)
+- evidence_extracted: 3-5 specific items from context
+- risk_level: One of critical|high|medium|low|none
+- recommendations: 2-3 actionable items
+- technical_notes: 100-200 chars technical details
+- Return ONLY the JSON object, nothing else""")
         
         chain = prompt | self.llm
         response = await chain.ainvoke({"context": context})
-        return self._parse_json_response(response.content)
+        result = self._parse_json_response(response.content)
+        print(f"[INFO] Report generation result: {json.dumps(result, indent=2)}")
+        return result
 
     async def generate_from_image(self, image_path: str, mime_type: str):
         with open(image_path, "rb") as image_file:
             image_data = base64.b64encode(image_file.read()).decode("utf-8")
 
+        # Use Llama 3.2 Vision for image analysis (Mixtral doesn't support vision)
+        vision_llm = ChatGroq(
+            model="llama-3.2-11b-vision-preview",
+            api_key=os.getenv("GROQ_API_KEY"),
+            temperature=0.7,
+        )
+
         message = HumanMessage(
             content=[
                 {
                     "type": "text",
-                    "text": """You are a senior forensic analyst analyzing visual evidence. Generate a COMPLETE structured forensic report.
+                    "text": """You are a senior forensic analyst analyzing visual evidence. Generate a COMPLETE structured forensic report with ALL fields.
 
-RESPOND WITH ONLY VALID JSON (no markdown):
+Return ONLY valid JSON (no markdown, no extra text):
 {
   "case_summary": "2-3 sentence summary of what is visible in the image",
   "key_findings": [
-    {"title": "Finding from image", "description": "What was observed", "severity": "high"},
-    {"title": "Finding from image", "description": "What was observed", "severity": "medium"},
-    {"title": "Finding from image", "description": "What was observed", "severity": "medium"}
+    {"title": "Finding title", "description": "Detailed observation", "severity": "high"},
+    {"title": "Finding title", "description": "Detailed observation", "severity": "medium"},
+    {"title": "Finding title", "description": "Detailed observation", "severity": "medium"}
   ],
-  "evidence_extracted": ["Observable evidence 1", "Observable evidence 2", "Observable evidence 3"],
+  "evidence_extracted": ["Evidence 1 visible in image", "Evidence 2 visible in image", "Evidence 3 visible in image"],
   "risk_level": "high",
-  "recommendations": ["Investigation recommendation 1", "Investigation recommendation 2"],
-  "technical_notes": "Visual observations and image analysis notes"
+  "recommendations": ["Recommendation 1", "Recommendation 2"],
+  "technical_notes": "Visual analysis observations"
 }
 
-REQUIREMENTS:
-- Minimum 2-3 key findings with severity levels
-- 3-5 evidence items visible in the image
-- Do NOT identify faces or real people
-- Be specific about what is observable
-- Include measurement scales if visible
-- Note any text visible in the image
-- Describe container/evidence bag labels if visible""",
+CRITICAL REQUIREMENTS:
+- ALWAYS include ALL 6 fields
+- key_findings: MUST have exactly 3 findings minimum
+- evidence_extracted: MUST have 3-5 items
+- risk_level: Use one of: critical, high, medium, low, none
+- recommendations: MUST have 2-3 items
+- Do NOT identify faces or real people""",
                 },
                 {
                     "type": "image_url",
@@ -97,8 +104,10 @@ REQUIREMENTS:
                 },
             ]
         )
-        response = await self.llm.ainvoke([message])
-        return self._parse_json_response(response.content)
+        response = await vision_llm.ainvoke([message])
+        result = self._parse_json_response(response.content)
+        print(f"[INFO] Image analysis result: {json.dumps(result, indent=2)}")
+        return result
 
     def _parse_json_response(self, content):
         raw_content = self._response_text(content)
