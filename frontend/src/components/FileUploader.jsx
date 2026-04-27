@@ -23,7 +23,7 @@ export default function FileUploader({ onUpload, disabled }) {
       <button
         onClick={() => inputRef.current?.click()}
         disabled={disabled}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
       >
         <Upload size={20} />
         {disabled ? 'Processing...' : 'Upload Evidence'}

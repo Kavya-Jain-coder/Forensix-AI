@@ -1,18 +1,31 @@
+import { useState } from 'react';
+import Home from './components/Home';
 import Dashboard from './components/Dashboard';
 
 function App() {
+  const [currentPage, setCurrentPage] = useState('home');
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <nav className="border-b bg-white px-8 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs">FX</div>
-          FORENSIX AI
-        </h1>
-        <div className="text-sm font-medium text-slate-500 underline">Internal Investigation Portal</div>
-      </nav>
-      <main className="max-w-7xl mx-auto p-8">
-        <Dashboard />
-      </main>
+    <div>
+      {currentPage === 'home' ? (
+        <Home onNavigateToDashboard={() => setCurrentPage('dashboard')} />
+      ) : (
+        <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white">
+          <nav className="border-b border-slate-700 bg-slate-900/80 backdrop-blur-md px-8 py-4 flex justify-between items-center">
+            <button 
+              onClick={() => setCurrentPage('home')}
+              className="text-xl font-bold tracking-tight flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center text-white text-xs">FX</div>
+              FORENSIX AI
+            </button>
+            <div className="text-sm font-medium text-slate-400">Internal Investigation Portal</div>
+          </nav>
+          <main className="max-w-7xl mx-auto p-8">
+            <Dashboard onNavigateToHome={() => setCurrentPage('home')} />
+          </main>
+        </div>
+      )}
     </div>
   );
 }
