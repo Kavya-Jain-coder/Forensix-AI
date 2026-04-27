@@ -18,7 +18,10 @@ class DocumentProcessor:
                         img = page.to_image().original
                         text += pytesseract.image_to_string(img) + "\n"
         elif file_type.startswith("image/"):
-            text = pytesseract.image_to_string(Image.open(file_path))
+            try:
+                text = pytesseract.image_to_string(Image.open(file_path))
+            except pytesseract.TesseractNotFoundError:
+                text = ""
         else:
             with open(file_path, "r") as f:
                 text = f.read()

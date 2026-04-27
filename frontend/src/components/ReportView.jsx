@@ -2,10 +2,17 @@ import React from 'react';
 import { Download, Copy, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function ReportView({ report }) {
+  const formatContent = (content) => {
+    if (Array.isArray(content)) {
+      return content.map((item) => `• ${item}`).join('\n');
+    }
+    return content;
+  };
+
   const Section = ({ title, content }) => (
     <div className="mb-8">
       <h3 className="text-xs font-bold uppercase tracking-widest text-blue-400 mb-2">{title}</h3>
-      <div className="text-slate-200 leading-relaxed whitespace-pre-wrap">{content}</div>
+      <div className="text-slate-200 leading-relaxed whitespace-pre-wrap">{formatContent(content)}</div>
     </div>
   );
 

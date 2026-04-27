@@ -20,7 +20,16 @@ export default function Dashboard({ onNavigateToHome }) {
         method: 'POST',
         body: formData,
       });
-      if (!response.ok) throw new Error('Failed to process file');
+      if (!response.ok) {
+        let message = 'Failed to process file';
+        try {
+          const errorData = await response.json();
+          message = errorData.detail || message;
+        } catch {
+          message = response.statusText || message;
+        }
+        throw new Error(message);
+      }
       const data = await response.json();
       setReport(data);
     } catch (err) {
