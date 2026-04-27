@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Zap, Lock, BarChart3, ArrowRight, CheckCircle } from 'lucide-react';
+import forensixLogo from '../assets/forensix-logo.png';
 
 export default function Home({ onNavigateToDashboard }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -9,9 +10,8 @@ export default function Home({ onNavigateToDashboard }) {
       {/* Navigation */}
       <nav className="fixed w-full top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-700">
         <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">FX</div>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">FORENSIX AI</span>
+          <div className="flex items-center">
+            <img src={forensixLogo} alt="Forensix AI" className="h-12 w-auto object-contain" />
           </div>
           <button 
             onClick={onNavigateToDashboard}
@@ -171,9 +171,8 @@ export default function Home({ onNavigateToDashboard }) {
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 bg-blue-600 rounded-lg"></div>
-                <span className="font-bold">FORENSIX AI</span>
+              <div className="flex items-center mb-4">
+                <img src={forensixLogo} alt="Forensix AI" className="h-10 w-auto object-contain" />
               </div>
               <p className="text-slate-400">Advanced forensic analysis powered by AI</p>
             </div>

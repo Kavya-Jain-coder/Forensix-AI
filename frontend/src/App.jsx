@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Home from './components/Home';
 import Dashboard from './components/Dashboard';
+import forensixLogo from './assets/forensix-logo.png';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -14,10 +15,10 @@ function App() {
           <nav className="border-b border-slate-700 bg-slate-900/80 backdrop-blur-md px-8 py-4 flex justify-between items-center">
             <button 
               onClick={() => setCurrentPage('home')}
-              className="text-xl font-bold tracking-tight flex items-center gap-2 hover:opacity-80 transition-opacity"
+              className="flex items-center hover:opacity-80 transition-opacity"
+              aria-label="Go to home"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center text-white text-xs">FX</div>
-              FORENSIX AI
+              <img src={forensixLogo} alt="Forensix AI" className="h-12 w-auto object-contain" />
             </button>
             <div className="text-sm font-medium text-slate-400">Internal Investigation Portal</div>
           </nav>
