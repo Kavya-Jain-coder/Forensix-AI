@@ -4,6 +4,19 @@ import FileUploader from './FileUploader';
 import ReportView from './ReportView';
 import LoadingState from './LoadingState';
 
+const getApiBaseUrl = () => {
+  const configuredUrl = import.meta.env.VITE_API_URL;
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/$/, '');
+  }
+
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://127.0.0.1:8000';
+  }
+
+  return null;
+};
+
 export default function Dashboard({ onNavigateToHome }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -16,7 +29,12 @@ export default function Dashboard({ onNavigateToHome }) {
     formData.append('file', file);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-report`, {
+      const apiBaseUrl = getApiBaseUrl();
+      if (!apiBaseUrl) {
+        throw new Error('Hosted API URL is not configured. Set VITE_API_URL in Vercel to your deployed backend URL.');
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/generate-report`, {
         method: 'POST',
         body: formData,
       });
