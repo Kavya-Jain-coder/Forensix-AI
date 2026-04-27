@@ -18,7 +18,7 @@ function App() {
               className="flex items-center hover:opacity-80 transition-opacity"
               aria-label="Go to home"
             >
-              <img src={forensixLogo} alt="Forensix AI" className="h-12 w-auto object-contain" />
+              <img src={forensixLogo} alt="Forensix AI" className="h-14 w-auto object-contain" />
             </button>
             <div className="text-sm font-medium text-slate-400">Internal Investigation Portal</div>
           </nav>

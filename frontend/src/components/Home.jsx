@@ -11,7 +11,7 @@ export default function Home({ onNavigateToDashboard }) {
       <nav className="fixed w-full top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-700">
         <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <img src={forensixLogo} alt="Forensix AI" className="h-12 w-auto object-contain" />
+            <img src={forensixLogo} alt="Forensix AI" className="h-14 w-auto object-contain" />
           </div>
           <button 
             onClick={onNavigateToDashboard}
@@ -172,7 +172,7 @@ export default function Home({ onNavigateToDashboard }) {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center mb-4">
-                <img src={forensixLogo} alt="Forensix AI" className="h-10 w-auto object-contain" />
+                <img src={forensixLogo} alt="Forensix AI" className="h-12 w-auto object-contain" />
               </div>
               <p className="text-slate-400">Advanced forensic analysis powered by AI</p>
             </div>
