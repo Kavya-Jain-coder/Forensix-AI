@@ -48,19 +48,19 @@ export default function Home({ onNavigateToDashboard }) {
                 </button>
               </div>
 
-              {/* Stats */}
+              {/* Capabilities */}
               <div className="grid grid-cols-3 gap-4 pt-8">
                 <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                  <div className="text-2xl font-bold text-blue-400">99%</div>
-                  <div className="text-sm text-slate-400">Accuracy</div>
+                  <div className="text-2xl font-bold text-blue-400">PDF</div>
+                  <div className="text-sm text-slate-400">Text Evidence</div>
                 </div>
                 <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                  <div className="text-2xl font-bold text-cyan-400">&lt;5s</div>
-                  <div className="text-sm text-slate-400">Processing</div>
+                  <div className="text-2xl font-bold text-cyan-400">IMG</div>
+                  <div className="text-sm text-slate-400">Visual Evidence</div>
                 </div>
                 <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                  <div className="text-2xl font-bold text-purple-400">∞</div>
-                  <div className="text-sm text-slate-400">Evidence Types</div>
+                  <div className="text-2xl font-bold text-purple-400">RAG</div>
+                  <div className="text-sm text-slate-400">Cited Context</div>
                 </div>
               </div>
             </div>
@@ -89,19 +89,19 @@ export default function Home({ onNavigateToDashboard }) {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-8 bg-slate-800/30">
+      <section id="features" className="py-20 px-8 bg-slate-800/30 scroll-mt-24">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Powerful Features</h2>
-            <p className="text-xl text-slate-400">Everything you need for forensic analysis</p>
+            <h2 className="text-4xl font-bold mb-4">Core Features</h2>
+            <p className="text-xl text-slate-400">Focused tools for evidence review and report drafting</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: FileText, title: "Multi-Format Support", desc: "PDF, Images, Text & More" },
-              { icon: Zap, title: "Lightning Fast", desc: "Process in seconds" },
-              { icon: Lock, title: "Secure & Private", desc: "Enterprise-grade security" },
-              { icon: BarChart3, title: "Detailed Reports", desc: "Comprehensive analysis" }
+              { icon: FileText, title: "Evidence Upload", desc: "Submit text files, PDFs, and image evidence" },
+              { icon: Zap, title: "Image-Aware Analysis", desc: "Use Gemini vision when images contain no OCR text" },
+              { icon: Lock, title: "Controlled Inputs", desc: "Reports are generated from the uploaded evidence only" },
+              { icon: BarChart3, title: "Structured Reports", desc: "Receive summary, observations, analysis, limits, and conclusion" }
             ].map((feature, i) => (
               <div key={i} className="p-6 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-blue-500 hover:bg-slate-800/70 transition-all duration-300 group">
                 <feature.icon className="w-8 h-8 text-blue-400 mb-4 group-hover:scale-110 transition-transform" />
@@ -114,16 +114,16 @@ export default function Home({ onNavigateToDashboard }) {
       </section>
 
       {/* How It Works */}
-      <section className="py-20 px-8">
+      <section id="workflow" className="py-20 px-8 scroll-mt-24">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-16">How It Works</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
               { num: "1", title: "Upload", desc: "Drop your evidence file" },
-              { num: "2", title: "Analyze", desc: "AI processes the data" },
-              { num: "3", title: "Retrieve", desc: "Semantic search finds context" },
-              { num: "4", title: "Report", desc: "Get detailed findings" }
+              { num: "2", title: "Extract", desc: "Read text or inspect image content" },
+              { num: "3", title: "Retrieve", desc: "Collect relevant evidence segments" },
+              { num: "4", title: "Report", desc: "Draft a structured forensic report" }
             ].map((step, i) => (
               <div key={i} className="relative">
                 <div className="bg-gradient-to-br from-blue-600/20 to-cyan-600/20 rounded-xl p-6 border border-slate-700 text-center">
@@ -144,8 +144,8 @@ export default function Home({ onNavigateToDashboard }) {
       <section className="py-20 px-8 bg-gradient-to-r from-blue-600/10 to-cyan-600/10 border-t border-b border-slate-700">
         <div className="max-w-4xl mx-auto text-center space-y-8">
           <div>
-            <h2 className="text-4xl font-bold mb-4">Ready to Revolutionize Forensics?</h2>
-            <p className="text-xl text-slate-300">Start analyzing evidence with AI-powered insights today</p>
+            <h2 className="text-4xl font-bold mb-4">Start an Evidence Review</h2>
+            <p className="text-xl text-slate-300">Upload evidence and generate an AI-assisted draft report with cited context.</p>
           </div>
 
           <button
@@ -156,7 +156,7 @@ export default function Home({ onNavigateToDashboard }) {
           </button>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-            {["Trusted by 500+ organizations", "99.9% Uptime", "24/7 Support"].map((item, i) => (
+            {["PDF and text extraction", "Image evidence analysis", "Report sections with citations"].map((item, i) => (
               <div key={i} className="flex items-center gap-2 justify-center">
                 <CheckCircle size={20} className="text-green-400" />
                 <span className="text-slate-300">{item}</span>
@@ -174,18 +174,47 @@ export default function Home({ onNavigateToDashboard }) {
               <div className="flex items-center mb-4">
                 <img src={forensixLogo} alt="Forensix AI" className="h-12 w-auto object-contain" />
               </div>
-              <p className="text-slate-400">Advanced forensic analysis powered by AI</p>
+              <p className="text-slate-400">AI-assisted forensic report drafting from uploaded evidence.</p>
             </div>
             {[
-              { title: "Product", links: ["Features", "Pricing", "Documentation"] },
-              { title: "Company", links: ["About", "Blog", "Contact"] },
-              { title: "Legal", links: ["Privacy", "Terms", "License"] }
+              { title: "Product", links: [
+                { label: "Features", href: "#features" },
+                { label: "Workflow", href: "#workflow" },
+                { label: "Launch App", action: onNavigateToDashboard }
+              ] },
+              { title: "Resources", links: [
+                { label: "API Docs", href: "https://forensix-ai.onrender.com/docs", external: true },
+                { label: "Source Code", href: "https://github.com/Kavya-Jain-coder/Forensix-AI", external: true },
+                { label: "Deployment Notes", href: "https://github.com/Kavya-Jain-coder/Forensix-AI/blob/main/DEPLOYMENT.md", external: true }
+              ] },
+              { title: "Notes", links: [
+                { label: "AI-assisted output" },
+                { label: "Requires human review" },
+                { label: "Evidence-only prompts" }
+              ] }
             ].map((col, i) => (
               <div key={i}>
                 <h4 className="font-semibold mb-4">{col.title}</h4>
                 <ul className="space-y-2">
-                  {col.links.map((link, j) => (
-                    <li key={j}><a href="#" className="text-slate-400 hover:text-white transition">{link}</a></li>
+                  {col.links.map((link) => (
+                    <li key={link.label}>
+                      {link.action ? (
+                        <button type="button" onClick={link.action} className="text-left text-slate-400 hover:text-white transition">
+                          {link.label}
+                        </button>
+                      ) : link.href ? (
+                        <a
+                          href={link.href}
+                          target={link.external ? '_blank' : undefined}
+                          rel={link.external ? 'noreferrer' : undefined}
+                          className="text-slate-400 hover:text-white transition"
+                        >
+                          {link.label}
+                        </a>
+                      ) : (
+                        <span className="text-slate-500">{link.label}</span>
+                      )}
+                    </li>
                   ))}
                 </ul>
               </div>
