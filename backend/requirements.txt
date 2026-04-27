@@ -6,7 +6,7 @@ pytesseract
 pillow
 langchain
 langchain-community
-langchain-google-genai
+langchain-groq
 faiss-cpu
 python-dotenv
 pydantic

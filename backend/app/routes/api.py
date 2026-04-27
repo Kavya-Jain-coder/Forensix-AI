@@ -59,8 +59,29 @@ async def process_document(file: UploadFile = File(...)):
         report_data = await generator.generate(context)
         print("[INFO] Report generated successfully")
         
+        # Ensure all required fields exist
+        report_data = {
+            "case_summary": report_data.get("case_summary", "Analysis of provided evidence."),
+            "key_findings": report_data.get("key_findings", []),
+            "evidence_extracted": report_data.get("evidence_extracted", []),
+            "risk_level": report_data.get("risk_level", "medium"),
+            "recommendations": report_data.get("recommendations", []),
+            "technical_notes": report_data.get("technical_notes"),
+        }
+        
+        # Validate we have findings
+        if not report_data.get("key_findings"):
+            print("[WARNING] No key findings in report, adding default")
+            report_data["key_findings"] = [
+                {
+                    "title": "Evidence Observed",
+                    "description": context[:200] + "...",
+                    "severity": "medium"
+                }
+            ]
+        
         # 5. Format Citations
-        citations = [{"content": doc.page_content, "source": f"Evidence Segment {i+1}"} 
+        citations = [{"content": doc.page_content, "segment_id": i+1} 
                      for i, (doc, score) in enumerate(docs)]
 
         return {
