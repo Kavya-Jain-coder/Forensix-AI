@@ -15,7 +15,7 @@ class ReportGenerator:
         if not api_key:
             raise ValueError("GROQ_API_KEY is not configured. Add it to your .env file.")
 
-        model = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
+        model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
         print(f"[INFO] Using Groq model: {model}")
         self.llm = ChatGroq(
             model=model,
