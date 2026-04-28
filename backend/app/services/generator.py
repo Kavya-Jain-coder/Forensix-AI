@@ -1,10 +1,8 @@
 import os
 import json
 import re
-import base64
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -60,54 +58,27 @@ CRITICAL REQUIREMENTS:
         return result
 
     async def generate_from_image(self, image_path: str, mime_type: str):
-        with open(image_path, "rb") as image_file:
-            image_data = base64.b64encode(image_file.read()).decode("utf-8")
-
-        # Use Llama 3.2 Vision for image analysis (Mixtral doesn't support vision)
-        vision_llm = ChatGroq(
-            model="llama-3.2-11b-vision-preview",
-            api_key=os.getenv("GROQ_API_KEY"),
-            temperature=0.7,
-        )
-
-        message = HumanMessage(
-            content=[
-                {
-                    "type": "text",
-                    "text": """You are a senior forensic analyst analyzing visual evidence. Generate a COMPLETE structured forensic report with ALL fields.
-
-Return ONLY valid JSON (no markdown, no extra text):
-{
-  "case_summary": "2-3 sentence summary of what is visible in the image",
-  "key_findings": [
-    {"title": "Finding title", "description": "Detailed observation", "severity": "high"},
-    {"title": "Finding title", "description": "Detailed observation", "severity": "medium"},
-    {"title": "Finding title", "description": "Detailed observation", "severity": "medium"}
-  ],
-  "evidence_extracted": ["Evidence 1 visible in image", "Evidence 2 visible in image", "Evidence 3 visible in image"],
-  "risk_level": "high",
-  "recommendations": ["Recommendation 1", "Recommendation 2"],
-  "technical_notes": "Visual analysis observations"
-}
-
-CRITICAL REQUIREMENTS:
-- ALWAYS include ALL 6 fields
-- key_findings: MUST have exactly 3 findings minimum
-- evidence_extracted: MUST have 3-5 items
-- risk_level: Use one of: critical, high, medium, low, none
-- recommendations: MUST have 2-3 items
-- Do NOT identify faces or real people""",
-                },
-                {
-                    "type": "image_url",
-                    "image_url": f"data:{mime_type};base64,{image_data}",
-                },
-            ]
-        )
-        response = await vision_llm.ainvoke([message])
-        result = self._parse_json_response(response.content)
-        print(f"[INFO] Image analysis result: {json.dumps(result, indent=2)}")
-        return result
+        """
+        Fallback for image analysis when OCR doesn't extract text.
+        Since Groq no longer provides vision models, generate report from image metadata.
+        """
+        import os
+        
+        filename = os.path.basename(image_path)
+        
+        # Create a context based on image metadata
+        context = f"""
+        Image Evidence: {filename}
+        File Type: {mime_type}
+        
+        Analysis: Visual evidence has been received. Detailed text extraction was not possible through automated OCR.
+        Manual review and analysis of the image evidence is recommended for accurate forensic assessment.
+        
+        Evidence Type: Image-based forensic evidence requiring visual interpretation.
+        """
+        
+        # Generate report from this minimal context
+        return await self.generate(context)
 
     def _parse_json_response(self, content):
         raw_content = self._response_text(content)
