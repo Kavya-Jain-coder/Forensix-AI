@@ -2,7 +2,7 @@ import os
 import json
 import re
 from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,7 +22,7 @@ class ReportGenerator:
         )
 
     async def generate(self, context: str):
-        prompt = ChatPromptTemplate.from_template("""You are a senior forensic analyst. Analyze the evidence and generate a COMPLETE forensic report.
+        prompt_text = f"""You are a senior forensic analyst. Analyze the evidence and generate a COMPLETE forensic report.
 
 EVIDENCE:
 {context}
@@ -49,10 +49,9 @@ CRITICAL REQUIREMENTS:
 - risk_level: One of critical|high|medium|low|none
 - recommendations: 2-3 actionable items
 - technical_notes: 100-200 chars technical details
-- Return ONLY the JSON object, nothing else""")
-        
-        chain = prompt | self.llm
-        response = await chain.ainvoke({"context": context})
+- Return ONLY the JSON object, nothing else"""
+
+        response = await self.llm.ainvoke([HumanMessage(content=prompt_text)])
         result = self._parse_json_response(response.content)
         print(f"[INFO] Report generation result: {json.dumps(result, indent=2)}")
         return result
