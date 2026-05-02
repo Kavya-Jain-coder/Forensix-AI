@@ -3,8 +3,9 @@ import { AuthProvider, useAuth, isAdmin } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import CaseDashboard from './pages/CaseDashboard';
 import CaseDetail from './pages/CaseDetail';
+import AdminPanel from './pages/AdminPanel';
 import Home from './components/Home';
-import { LogOut, User, Shield } from 'lucide-react';
+import { LogOut, User, Shield, FolderOpen } from 'lucide-react';
 import forensixLogo from './assets/forensix-logo.png';
 
 const roleColors = {
@@ -18,6 +19,7 @@ function AppInner() {
   const { user, logout, loading } = useAuth();
   const [page, setPage] = useState('home');
   const [selectedCase, setSelectedCase] = useState(null);
+  const [appPage, setAppPage] = useState('cases'); // 'cases' | 'admin'
 
   if (loading) {
     return (
@@ -37,9 +39,23 @@ function AppInner() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white">
       <nav className="border-b border-slate-700 bg-slate-900/80 backdrop-blur-md px-6 py-3 flex justify-between items-center sticky top-0 z-40">
-        <button onClick={() => { setSelectedCase(null); setPage('dashboard'); }} className="hover:opacity-80 transition-opacity">
-          <img src={forensixLogo} alt="ForensixAI" className="h-10 w-auto object-contain" />
-        </button>
+        <div className="flex items-center gap-6">
+          <button onClick={() => { setSelectedCase(null); setAppPage('cases'); }} className="hover:opacity-80 transition-opacity">
+            <img src={forensixLogo} alt="ForensixAI" className="h-10 w-auto object-contain" />
+          </button>
+          <div className="flex gap-1">
+            <button onClick={() => { setSelectedCase(null); setAppPage('cases'); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${appPage === 'cases' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
+              <FolderOpen size={14} /> Cases
+            </button>
+            {isAdmin(user) && (
+              <button onClick={() => setAppPage('admin')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${appPage === 'admin' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
+                <Shield size={14} /> Admin
+              </button>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-3">
           <span className={`text-xs px-2 py-1 rounded-full border font-medium ${roleColors[user.role] || 'text-slate-400'}`}>
             {user.role.replace('_', ' ').toUpperCase()}
@@ -56,10 +72,12 @@ function AppInner() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {selectedCase ? (
+        {appPage === 'admin' && isAdmin(user) ? (
+          <AdminPanel />
+        ) : selectedCase ? (
           <CaseDetail caseData={selectedCase} onBack={() => setSelectedCase(null)} />
         ) : (
-          <CaseDashboard onSelectCase={setSelectedCase} />
+          <CaseDashboard onSelectCase={(c) => { setSelectedCase(c); setAppPage('cases'); }} />
         )}
       </main>
     </div>
