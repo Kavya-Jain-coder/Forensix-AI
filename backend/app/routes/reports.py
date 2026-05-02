@@ -44,9 +44,9 @@ class ReportOut(BaseModel):
 
     @classmethod
     def from_orm_custom(cls, r: Report):
-        data = cls.model_validate(r)
-        data.report_data = json.loads(r.report_data)
-        return data
+        d = {c.name: getattr(r, c.name) for c in r.__table__.columns}
+        d["report_data"] = json.loads(r.report_data)
+        return cls.model_validate(d)
 
 
 @router.post("", response_model=ReportOut)
