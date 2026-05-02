@@ -35,3 +35,5 @@ build/
 
 # Uploads
 uploads/
+evidence_store/
+backend/forensix.db
