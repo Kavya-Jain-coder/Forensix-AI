@@ -69,50 +69,74 @@ async def generate_report(
 
     all_texts = []
     filenames = []
+    image_only = []
+
     for ev in evidence_list:
+        # Log chain of custody
+        db.add(ChainOfCustody(
+            evidence_id=ev.id,
+            action="ACCESSED_FOR_REPORT",
+            performed_by_id=current_user.id,
+            notes="Evidence accessed for report generation",
+            ip_address=get_client_ip(request),
+        ))
+        filenames.append(ev.original_filename)
         if ev.extracted_text and ev.extracted_text.strip():
             all_texts.append(f"=== EXHIBIT: {ev.exhibit_ref} — {ev.original_filename} ===\n{ev.extracted_text}")
-            filenames.append(ev.original_filename)
+        else:
+            image_only.append(ev)
 
-            custody = ChainOfCustody(
-                evidence_id=ev.id,
-                action="ACCESSED_FOR_REPORT",
-                performed_by_id=current_user.id,
-                notes=f"Evidence accessed for report generation",
-                ip_address=get_client_ip(request),
-            )
-            db.add(custody)
-
-    if not all_texts:
-        raise HTTPException(status_code=400, detail="No readable text found in any evidence for this case")
-
-    combined_text = "\n\n".join(all_texts)
     case_meta = {
         "officer_in_charge": officer_in_charge,
         "submitted_by": submitted_by,
         "date_of_examination": date_of_examination,
     }
 
-    _, docs, confidence = rag_service.retrieve_context(
-        rag_service.create_vector_store(combined_text),
-        "Summarize all forensic evidence, findings, subjects, exhibits, and key observations."
-    )
+    # Build context — fall back to image metadata if no OCR text
+    if not all_texts:
+        exhibits_desc = "\n".join(
+            f"  Exhibit {ev.exhibit_ref}: {ev.original_filename} — {ev.file_type}, "
+            f"{ev.file_size // 1024} KB, SHA-256: {ev.sha256_hash}"
+            for ev in image_only
+        )
+        combined_text = (
+            f"Visual forensic evidence submitted for examination.\n"
+            f"Case: {case.title}\n"
+            f"Case Number: {case.case_number}\n\n"
+            f"Submitted Exhibits (image-based crime scene photographs):\n{exhibits_desc}\n\n"
+            f"Examination Note:\n"
+            f"These exhibits are photographic forensic evidence captured at the crime scene. "
+            f"OCR text extraction was not applicable as these are images. "
+            f"Each image should be treated as a physical exhibit requiring visual forensic "
+            f"examination — analysis of scene layout, physical evidence visible, damage patterns, "
+            f"trace evidence, body position, environmental conditions, and any other forensically "
+            f"relevant features observable in the photographs."
+        )
+        confidence = 0.55
+        docs = []
+    else:
+        # Mix of text + images
+        if image_only:
+            all_texts.append("=== ADDITIONAL IMAGE EXHIBITS (crime scene photographs) ===")
+            for ev in image_only:
+                all_texts.append(f"Exhibit {ev.exhibit_ref}: {ev.original_filename} ({ev.file_type})")
+        combined_text = "\n\n".join(all_texts)
+        vector_store = rag_service.create_vector_store(combined_text)
+        _, docs, confidence = rag_service.retrieve_context(
+            vector_store,
+            "Summarize all forensic evidence, findings, subjects, exhibits, and key observations."
+        )
 
     report_data = await generator.generate(combined_text, filenames, case_meta)
 
-    # Attach SHA-256 hashes to exhibits in report
-    hash_map = {ev.original_filename: ev.sha256_hash for ev in evidence_list}
-    if "exhibits" in report_data:
-        for exhibit in report_data["exhibits"]:
-            for fname, sha in hash_map.items():
-                if fname.lower() in exhibit.get("description", "").lower() or \
-                   fname.lower() in exhibit.get("exhibit_ref", "").lower():
-                    exhibit["sha256_hash"] = sha
-                    break
-
+    # Attach SHA-256 hashes
     report_data["evidence_hashes"] = [
-        {"exhibit_ref": ev.exhibit_ref, "filename": ev.original_filename,
-         "sha256": ev.sha256_hash, "size_bytes": ev.file_size}
+        {
+            "exhibit_ref": ev.exhibit_ref,
+            "filename": ev.original_filename,
+            "sha256": ev.sha256_hash,
+            "size_bytes": ev.file_size,
+        }
         for ev in evidence_list
     ]
 
@@ -186,7 +210,7 @@ async def review_report(
     case_id: str,
     report_id: str,
     request: Request,
-    action: str = Form(...),  # "approve" or "reject"
+    action: str = Form(...),
     comments: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.REVIEWER)),
