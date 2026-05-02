@@ -11,3 +11,9 @@ langchain-google-genai
 faiss-cpu
 python-dotenv
 pydantic
+sqlalchemy
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.0.1
+reportlab
+langchain-text-splitters

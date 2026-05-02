@@ -1,34 +1,75 @@
 import { useState } from 'react';
+import { AuthProvider, useAuth, isAdmin } from './context/AuthContext';
+import LoginPage from './pages/LoginPage';
+import CaseDashboard from './pages/CaseDashboard';
+import CaseDetail from './pages/CaseDetail';
 import Home from './components/Home';
-import Dashboard from './components/Dashboard';
+import { LogOut, User, Shield } from 'lucide-react';
 import forensixLogo from './assets/forensix-logo.png';
 
-function App() {
-  const [currentPage, setCurrentPage] = useState('home');
+const roleColors = {
+  admin: 'text-red-400 bg-red-500/10 border-red-500/30',
+  forensic_officer: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',
+  investigator: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
+  reviewer: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+};
+
+function AppInner() {
+  const { user, logout, loading } = useAuth();
+  const [page, setPage] = useState('home');
+  const [selectedCase, setSelectedCase] = useState(null);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-slate-400 text-sm">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    if (page === 'home') {
+      return <Home onNavigateToDashboard={() => setPage('login')} />;
+    }
+    return <LoginPage />;
+  }
 
   return (
-    <div>
-      {currentPage === 'home' ? (
-        <Home onNavigateToDashboard={() => setCurrentPage('dashboard')} />
-      ) : (
-        <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white">
-          <nav className="border-b border-slate-700 bg-slate-900/80 backdrop-blur-md px-8 py-4 flex justify-between items-center">
-            <button 
-              onClick={() => setCurrentPage('home')}
-              className="flex items-center hover:opacity-80 transition-opacity"
-              aria-label="Go to home"
-            >
-              <img src={forensixLogo} alt="Forensix AI" className="h-14 w-auto object-contain" />
-            </button>
-            <div className="text-sm font-medium text-slate-400">Internal Investigation Portal</div>
-          </nav>
-          <main className="max-w-7xl mx-auto p-8">
-            <Dashboard onNavigateToHome={() => setCurrentPage('home')} />
-          </main>
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white">
+      <nav className="border-b border-slate-700 bg-slate-900/80 backdrop-blur-md px-6 py-3 flex justify-between items-center sticky top-0 z-40">
+        <button onClick={() => { setSelectedCase(null); setPage('dashboard'); }} className="hover:opacity-80 transition-opacity">
+          <img src={forensixLogo} alt="ForensixAI" className="h-10 w-auto object-contain" />
+        </button>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs px-2 py-1 rounded-full border font-medium ${roleColors[user.role] || 'text-slate-400'}`}>
+            {user.role.replace('_', ' ').toUpperCase()}
+          </span>
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <User size={15} className="text-slate-500" />
+            <span>{user.full_name}</span>
+            {user.badge_number && <span className="text-slate-500 text-xs">#{user.badge_number}</span>}
+          </div>
+          <button onClick={logout} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white text-sm transition-colors">
+            <LogOut size={14} /> Sign Out
+          </button>
         </div>
-      )}
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {selectedCase ? (
+          <CaseDetail caseData={selectedCase} onBack={() => setSelectedCase(null)} />
+        ) : (
+          <CaseDashboard onSelectCase={setSelectedCase} />
+        )}
+      </main>
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
+}
