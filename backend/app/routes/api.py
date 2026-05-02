@@ -1,8 +1,8 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from app.services.processor import DocumentProcessor
 from app.services.rag_service import RAGService
 from app.services.generator import ReportGenerator
-from typing import List
+from typing import List, Optional
 import os
 import shutil
 import traceback
@@ -12,7 +12,12 @@ rag_service = RAGService()
 generator = ReportGenerator()
 
 @router.post("/generate-report")
-async def process_documents(files: List[UploadFile] = File(...)):
+async def process_documents(
+    files: List[UploadFile] = File(...),
+    officer_in_charge: Optional[str] = Form(None),
+    submitted_by: Optional[str] = Form(None),
+    date_of_examination: Optional[str] = Form(None),
+):
     os.makedirs("uploads", exist_ok=True)
     temp_paths = []
 
@@ -48,7 +53,12 @@ async def process_documents(files: List[UploadFile] = File(...)):
         # If all files are images with no OCR text
         if not all_texts and image_paths:
             print("[INFO] All images, no OCR text. Generating from image metadata.")
-            report_data = await generator.generate_from_images(image_paths, image_mimes, image_names)
+            case_meta = {
+                "officer_in_charge": officer_in_charge,
+                "submitted_by": submitted_by,
+                "date_of_examination": date_of_examination,
+            }
+            report_data = await generator.generate_from_images(image_paths, image_mimes, image_names, case_meta)
             return {
                 **report_data,
                 "confidence_score": 55.0,
@@ -71,7 +81,12 @@ async def process_documents(files: List[UploadFile] = File(...)):
         print(f"[INFO] Context retrieved, confidence: {confidence:.3f}")
 
         # Generate
-        report_data = await generator.generate(context, filenames)
+        case_meta = {
+            "officer_in_charge": officer_in_charge,
+            "submitted_by": submitted_by,
+            "date_of_examination": date_of_examination,
+        }
+        report_data = await generator.generate(context, filenames, case_meta)
 
         # Ensure required fields
         defaults = {

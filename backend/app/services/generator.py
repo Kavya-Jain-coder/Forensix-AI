@@ -17,10 +17,15 @@ class ReportGenerator:
         print(f"[INFO] Using Groq model: {model}")
         self.llm = ChatGroq(model=model, api_key=api_key, temperature=0.3)
 
-    async def generate(self, context: str, filenames: list[str] = None):
+    async def generate(self, context: str, filenames: list[str] = None, case_meta: dict = None):
         exhibit_hint = ""
         if filenames:
             exhibit_hint = f"The submitted evidence files are: {', '.join(filenames)}."
+
+        meta = case_meta or {}
+        officer = meta.get("officer_in_charge") or "[to be assigned]"
+        submitted = meta.get("submitted_by") or "Forensic Submissions Unit"
+        exam_date = meta.get("date_of_examination") or "[today's date]"
 
         prompt_text = f"""You are a senior forensic scientist writing an official forensic laboratory report. Your report must read like a real forensic document — formal, precise, written in third-person narrative prose, referencing specific exhibit labels, sample identifiers, and scientific methodology.
 
@@ -29,15 +34,20 @@ class ReportGenerator:
 EVIDENCE CONTENT:
 {context}
 
+The following case details have been provided by the submitting officer and MUST be used exactly as given — do not change or infer alternatives:
+- Officer in Charge: {officer}
+- Submitted By: {submitted}
+- Date of Examination: {exam_date}
+
 Generate a detailed forensic report in the following JSON structure. Every field must be substantive and specific to the evidence provided — do NOT use generic placeholder text.
 
 Return ONLY valid JSON:
 {{
   "report_number": "FR-2024-XXXX (generate a realistic report number)",
   "classification": "OFFICIAL — FORENSIC SCIENCE LABORATORY REPORT",
-  "officer_in_charge": "Infer or assign a plausible investigating officer name and badge/reference",
-  "submitted_by": "Infer submitting agency or officer from context, or use 'Forensic Submissions Unit'",
-  "date_of_examination": "Use today's date in DD Month YYYY format",
+  "officer_in_charge": "{officer}",
+  "submitted_by": "{submitted}",
+  "date_of_examination": "{exam_date}",
   "exhibits": [
     {{"exhibit_ref": "e.g. SJM/1", "description": "Detailed description of the item", "condition": "e.g. Good / Sealed / Degraded"}}
   ],
@@ -55,6 +65,7 @@ Return ONLY valid JSON:
 }}
 
 CRITICAL RULES:
+- officer_in_charge, submitted_by, and date_of_examination MUST match exactly what was provided above
 - Use specific names, exhibit references, and case details from the evidence — never say 'Subject A' or 'the individual'
 - examination_narrative must be at least 4 paragraphs of real forensic prose
 - key_findings must have at least 3 entries, each tied to a specific exhibit
@@ -65,7 +76,7 @@ CRITICAL RULES:
         print(f"[INFO] Report generated successfully")
         return result
 
-    async def generate_from_images(self, image_paths: list[str], mime_types: list[str], filenames: list[str]):
+    async def generate_from_images(self, image_paths: list[str], mime_types: list[str], filenames: list[str], case_meta: dict = None):
         exhibits_desc = "\n".join(
             f"- Exhibit {i+1}: {filenames[i]} (Type: {mime_types[i]})"
             for i in range(len(filenames))
@@ -80,7 +91,7 @@ Note: These are image-based exhibits. OCR text extraction was not possible.
 Examination is based on the submitted visual evidence files. 
 A detailed physical/visual examination of each exhibit is required."""
 
-        return await self.generate(context, filenames)
+        return await self.generate(context, filenames, case_meta)
 
     def _parse_json_response(self, content):
         raw = self._response_text(content)
