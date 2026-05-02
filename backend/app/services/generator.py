@@ -11,89 +11,90 @@ class ReportGenerator:
     def __init__(self):
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            raise ValueError("GROQ_API_KEY is not configured. Add it to your .env file.")
+            raise ValueError("GROQ_API_KEY is not configured.")
 
         model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
         print(f"[INFO] Using Groq model: {model}")
-        self.llm = ChatGroq(
-            model=model,
-            api_key=api_key,
-            temperature=0.7,
-        )
+        self.llm = ChatGroq(model=model, api_key=api_key, temperature=0.3)
 
-    async def generate(self, context: str):
-        prompt_text = f"""You are a senior forensic analyst. Analyze the evidence and generate a COMPLETE forensic report.
+    async def generate(self, context: str, filenames: list[str] = None):
+        exhibit_hint = ""
+        if filenames:
+            exhibit_hint = f"The submitted evidence files are: {', '.join(filenames)}."
 
-EVIDENCE:
+        prompt_text = f"""You are a senior forensic scientist writing an official forensic laboratory report. Your report must read like a real forensic document — formal, precise, written in third-person narrative prose, referencing specific exhibit labels, sample identifiers, and scientific methodology.
+
+{exhibit_hint}
+
+EVIDENCE CONTENT:
 {context}
 
-Return ONLY valid JSON (no markdown, no extra text):
+Generate a detailed forensic report in the following JSON structure. Every field must be substantive and specific to the evidence provided — do NOT use generic placeholder text.
+
+Return ONLY valid JSON:
 {{
-  "case_summary": "2-3 sentence objective summary of evidence and findings",
-  "key_findings": [
-    {{"title": "Finding 1", "description": "Detailed description", "severity": "critical"}},
-    {{"title": "Finding 2", "description": "Detailed description", "severity": "high"}},
-    {{"title": "Finding 3", "description": "Detailed description", "severity": "medium"}}
+  "report_number": "FR-2024-XXXX (generate a realistic report number)",
+  "classification": "OFFICIAL — FORENSIC SCIENCE LABORATORY REPORT",
+  "officer_in_charge": "Infer or assign a plausible investigating officer name and badge/reference",
+  "submitted_by": "Infer submitting agency or officer from context, or use 'Forensic Submissions Unit'",
+  "date_of_examination": "Use today's date in DD Month YYYY format",
+  "exhibits": [
+    {{"exhibit_ref": "e.g. SJM/1", "description": "Detailed description of the item", "condition": "e.g. Good / Sealed / Degraded"}}
   ],
-  "evidence_extracted": ["Evidence point 1", "Evidence point 2", "Evidence point 3"],
-  "risk_level": "high",
-  "recommendations": ["Recommendation 1", "Recommendation 2"],
-  "technical_notes": "Additional technical observations"
+  "background": "2-3 sentences of case background inferred from the evidence. Who are the subjects? What is the nature of the case?",
+  "examination_narrative": "Write 3-5 paragraphs of formal forensic narrative. Describe what was examined, the methodology used (e.g. DNA profiling, fingerprint analysis, digital forensics, toxicology), what was found on each exhibit, and how findings relate to each other. Use formal language like 'A DNA profile was obtained from...', 'Examination of exhibit X revealed...', 'The results are consistent with...'",
+  "key_findings": [
+    {{"finding_number": 1, "exhibit_ref": "exhibit reference", "finding": "Specific scientific finding in formal language", "significance": "critical|high|medium|low"}}
+  ],
+  "statistical_analysis": "If applicable, include likelihood ratios, probability statements, or statistical significance (e.g. 'The DNA profile is approximately 29 million times more likely if...'). If not applicable, write 'Not applicable to this examination.'",
+  "conclusion": "2-3 sentences formal conclusion. State what the evidence supports or does not support. Use language like 'The findings are consistent with...', 'I am of the opinion that...'",
+  "risk_level": "critical|high|medium|low",
+  "recommendations": ["Specific actionable recommendation 1", "Specific actionable recommendation 2"],
+  "examiner_statement": "I have examined the items listed above and the results of my examination are set out in this report. The opinions expressed are my own professional opinions based on the evidence examined.",
+  "confidence_note": "Brief note on confidence level and any limitations of the analysis"
 }}
 
-CRITICAL REQUIREMENTS:
-- Generate ALL 6 fields - NO MISSING FIELDS
-- case_summary: 50-150 words
-- key_findings: EXACTLY 3 findings, each with severity (critical|high|medium|low|none)
-- evidence_extracted: 3-5 specific items from context
-- risk_level: One of critical|high|medium|low|none
-- recommendations: 2-3 actionable items
-- technical_notes: 100-200 chars technical details
-- Return ONLY the JSON object, nothing else"""
+CRITICAL RULES:
+- Use specific names, exhibit references, and case details from the evidence — never say 'Subject A' or 'the individual'
+- examination_narrative must be at least 4 paragraphs of real forensic prose
+- key_findings must have at least 3 entries, each tied to a specific exhibit
+- Return ONLY the JSON object, no markdown, no extra text"""
 
         response = await self.llm.ainvoke([HumanMessage(content=prompt_text)])
         result = self._parse_json_response(response.content)
-        print(f"[INFO] Report generation result: {json.dumps(result, indent=2)}")
+        print(f"[INFO] Report generated successfully")
         return result
 
-    async def generate_from_image(self, image_path: str, mime_type: str):
-        """
-        Fallback for image analysis when OCR doesn't extract text.
-        Since Groq no longer provides vision models, generate report from image metadata.
-        """
-        import os
-        
-        filename = os.path.basename(image_path)
-        
-        # Create a context based on image metadata
-        context = f"""
-        Image Evidence: {filename}
-        File Type: {mime_type}
-        
-        Analysis: Visual evidence has been received. Detailed text extraction was not possible through automated OCR.
-        Manual review and analysis of the image evidence is recommended for accurate forensic assessment.
-        
-        Evidence Type: Image-based forensic evidence requiring visual interpretation.
-        """
-        
-        # Generate report from this minimal context
-        return await self.generate(context)
+    async def generate_from_images(self, image_paths: list[str], mime_types: list[str], filenames: list[str]):
+        exhibits_desc = "\n".join(
+            f"- Exhibit {i+1}: {filenames[i]} (Type: {mime_types[i]})"
+            for i in range(len(filenames))
+        )
+
+        context = f"""Visual forensic evidence submitted for examination.
+
+Submitted Exhibits:
+{exhibits_desc}
+
+Note: These are image-based exhibits. OCR text extraction was not possible. 
+Examination is based on the submitted visual evidence files. 
+A detailed physical/visual examination of each exhibit is required."""
+
+        return await self.generate(context, filenames)
 
     def _parse_json_response(self, content):
-        raw_content = self._response_text(content)
-        raw_content = raw_content.replace('```json', '').replace('```', '').strip()
-
+        raw = self._response_text(content)
+        raw = raw.replace('```json', '').replace('```', '').strip()
         try:
-            return json.loads(raw_content)
+            return json.loads(raw)
         except json.JSONDecodeError:
-            json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
-            if json_match:
+            match = re.search(r'\{.*\}', raw, re.DOTALL)
+            if match:
                 try:
-                    return json.loads(json_match.group())
+                    return json.loads(match.group())
                 except json.JSONDecodeError as e:
-                    print(f"Error parsing JSON: {e}")
-                    raise ValueError(f"LLM response is not valid JSON: {raw_content}")
-            raise ValueError(f"No JSON found in LLM response: {raw_content}")
+                    raise ValueError(f"LLM response is not valid JSON: {e}")
+            raise ValueError(f"No JSON found in LLM response: {raw[:200]}")
 
     @staticmethod
     def _response_text(content) -> str:

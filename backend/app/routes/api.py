@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.services.processor import DocumentProcessor
 from app.services.rag_service import RAGService
 from app.services.generator import ReportGenerator
+from typing import List
 import os
 import shutil
 import traceback
@@ -11,117 +12,104 @@ rag_service = RAGService()
 generator = ReportGenerator()
 
 @router.post("/generate-report")
-async def process_document(file: UploadFile = File(...)):
-    temp_path = f"uploads/{file.filename}"
+async def process_documents(files: List[UploadFile] = File(...)):
     os.makedirs("uploads", exist_ok=True)
-    
-    try:
-        print(f"[INFO] Processing file: {file.filename}")
-        
-        with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        print(f"[INFO] File saved to {temp_path}")
+    temp_paths = []
 
-        # 1. Extract
-        print("[INFO] Extracting text from file...")
-        text = DocumentProcessor.extract_text(temp_path, file.content_type)
-        if file.content_type and file.content_type.startswith("image/") and not text.strip():
-            print("[INFO] No OCR text found. Generating report from image evidence...")
-            report_data = await generator.generate_from_image(temp_path, file.content_type)
+    try:
+        all_texts = []
+        image_paths = []
+        image_mimes = []
+        image_names = []
+        filenames = [f.filename for f in files]
+
+        print(f"[INFO] Processing {len(files)} file(s): {filenames}")
+
+        for file in files:
+            temp_path = f"uploads/{file.filename}"
+            temp_paths.append(temp_path)
+
+            with open(temp_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            text = DocumentProcessor.extract_text(temp_path, file.content_type)
+
+            if file.content_type and file.content_type.startswith("image/") and not text.strip():
+                image_paths.append(temp_path)
+                image_mimes.append(file.content_type)
+                image_names.append(file.filename)
+                print(f"[INFO] {file.filename}: image with no OCR text, will use visual fallback")
+            elif text.strip():
+                all_texts.append(f"=== EXHIBIT: {file.filename} ===\n{text}")
+                print(f"[INFO] {file.filename}: extracted {len(text)} characters")
+            else:
+                print(f"[WARNING] {file.filename}: no text extracted, skipping")
+
+        # If all files are images with no OCR text
+        if not all_texts and image_paths:
+            print("[INFO] All images, no OCR text. Generating from image metadata.")
+            report_data = await generator.generate_from_images(image_paths, image_mimes, image_names)
             return {
                 **report_data,
-                "confidence_score": 100.0,
+                "confidence_score": 55.0,
                 "citations": [
-                    {
-                        "content": f"Visual analysis of uploaded image evidence: {file.filename}",
-                        "source": "Uploaded Image Evidence",
-                    }
+                    {"content": f"Visual evidence: {name}", "source": name}
+                    for name in image_names
                 ],
             }
 
-        if not text.strip():
-            raise HTTPException(status_code=400, detail="No readable text found in file.")
-        print(f"[INFO] Extracted {len(text)} characters")
+        if not all_texts:
+            raise HTTPException(status_code=400, detail="No readable content found in any uploaded file.")
 
-        # 2. RAG Indexing
-        print("[INFO] Creating vector store...")
-        vector_store = rag_service.create_vector_store(text)
-        print("[INFO] Vector store created")
-        
-        # 3. Context Retrieval
-        print("[INFO] Retrieving context...")
-        query = "Summarize findings and forensic evidence for a formal report."
+        combined_text = "\n\n".join(all_texts)
+        print(f"[INFO] Total combined text: {len(combined_text)} characters")
+
+        # RAG
+        vector_store = rag_service.create_vector_store(combined_text)
+        query = "Summarize all forensic evidence, findings, subjects, exhibits, and key observations for a formal report."
         context, docs, confidence = rag_service.retrieve_context(vector_store, query)
-        print(f"[INFO] Context retrieved with confidence: {confidence}")
+        print(f"[INFO] Context retrieved, confidence: {confidence:.3f}")
 
-        # 4. LLM Generation
-        print("[INFO] Generating report with LLM...")
-        report_data = await generator.generate(context)
-        print(f"[INFO] Raw report from LLM: {report_data}")
-        
-        # Ensure all required fields exist with proper defaults
-        report_data = {
-            "case_summary": report_data.get("case_summary", "Analysis of provided forensic evidence."),
-            "key_findings": report_data.get("key_findings", []),
-            "evidence_extracted": report_data.get("evidence_extracted", []),
-            "risk_level": report_data.get("risk_level", "medium"),
-            "recommendations": report_data.get("recommendations", []),
-            "technical_notes": report_data.get("technical_notes", "Evidence analyzed and documented."),
+        # Generate
+        report_data = await generator.generate(context, filenames)
+
+        # Ensure required fields
+        defaults = {
+            "report_number": "FR-2024-0001",
+            "classification": "OFFICIAL — FORENSIC SCIENCE LABORATORY REPORT",
+            "officer_in_charge": "Senior Forensic Examiner",
+            "submitted_by": "Forensic Submissions Unit",
+            "date_of_examination": "",
+            "exhibits": [],
+            "background": "Evidence submitted for forensic examination.",
+            "examination_narrative": context[:500],
+            "key_findings": [],
+            "statistical_analysis": "Not applicable to this examination.",
+            "conclusion": "Examination of submitted evidence is complete.",
+            "risk_level": "medium",
+            "recommendations": ["Further analysis recommended.", "Preserve all exhibits."],
+            "examiner_statement": "I have examined the items listed above and the results are set out in this report.",
+            "confidence_note": "Analysis based on available evidence.",
         }
-        
-        # Validate and fix key_findings
-        if not report_data.get("key_findings") or len(report_data["key_findings"]) == 0:
-            print("[WARNING] No key findings found, generating defaults from context")
-            report_data["key_findings"] = [
-                {
-                    "title": "Evidence Documentation",
-                    "description": context[:200].strip() + "...",
-                    "severity": "medium"
-                },
-                {
-                    "title": "Analysis Conducted",
-                    "description": "Systematic forensic analysis of provided evidence",
-                    "severity": "low"
-                }
-            ]
-        
-        # Validate and fix evidence_extracted
-        if not report_data.get("evidence_extracted") or len(report_data["evidence_extracted"]) == 0:
-            print("[WARNING] No evidence extracted, generating defaults")
-            sentences = context.split('.')[:3]
-            report_data["evidence_extracted"] = [s.strip() for s in sentences if s.strip()]
-            if len(report_data["evidence_extracted"]) < 2:
-                report_data["evidence_extracted"] = ["Evidence analyzed", "Documentation complete"]
-        
-        # Validate and fix recommendations
-        if not report_data.get("recommendations") or len(report_data["recommendations"]) == 0:
-            print("[WARNING] No recommendations, generating defaults")
-            report_data["recommendations"] = [
-                "Continue detailed forensic analysis",
-                "Document findings in case file"
-            ]
-        
-        print(f"[INFO] Report after validation: {report_data}")
-        
-        # 5. Format Citations
-        citations = [{"content": doc.page_content, "segment_id": i+1} 
+        for key, default in defaults.items():
+            if not report_data.get(key):
+                report_data[key] = default
+
+        citations = [{"content": doc.page_content[:200], "segment_id": i + 1}
                      for i, (doc, score) in enumerate(docs)]
 
         return {
             **report_data,
             "confidence_score": round(float(confidence) * 100, 2),
-            "citations": citations
+            "citations": citations,
         }
 
-    except HTTPException as e:
-        print(f"[ERROR] HTTP Exception: {e.detail}")
+    except HTTPException:
         raise
     except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)}"
-        print(f"[ERROR] {error_msg}")
-        print(f"[ERROR] Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=error_msg)
+        print(f"[ERROR] {type(e).__name__}: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}")
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-            print(f"[INFO] Cleaned up {temp_path}")
+        for path in temp_paths:
+            if os.path.exists(path):
+                os.remove(path)
