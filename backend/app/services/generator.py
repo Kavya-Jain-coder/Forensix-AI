@@ -19,7 +19,7 @@ class ReportGenerator:
             model=model,
             api_key=api_key,
             temperature=0.2,
-            max_tokens=8000,
+            max_tokens=4000,
         )
 
     async def generate(self, full_text: str, filenames: list[str] = None, case_meta: dict = None):

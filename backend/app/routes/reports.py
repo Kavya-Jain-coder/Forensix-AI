@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Form, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Report, ReportStatus, Evidence, Case, UserRole, AuditAction, User, ChainOfCustody
+from app.models import Report, ReportStatus, ReviewOutcome, Evidence, Case, UserRole, AuditAction, User, ChainOfCustody
 from app.auth import get_current_user, require_roles, log_action, get_client_ip
 from app.services.generator import ReportGenerator
 from app.services.rag_service import RAGService
@@ -26,7 +26,9 @@ class ReportOut(BaseModel):
     id: str
     case_id: str
     report_number: str
+    version: int
     status: ReportStatus
+    review_outcome: Optional[ReviewOutcome]
     report_data: dict
     confidence_score: Optional[float]
     generated_by_id: str
@@ -38,6 +40,7 @@ class ReportOut(BaseModel):
     officer_in_charge: Optional[str]
     submitted_by: Optional[str]
     date_of_examination: Optional[str]
+    parent_report_id: Optional[str]
 
     class Config:
         from_attributes = True
@@ -72,7 +75,6 @@ async def generate_report(
     image_only = []
 
     for ev in evidence_list:
-        # Log chain of custody
         db.add(ChainOfCustody(
             evidence_id=ev.id,
             action="ACCESSED_FOR_REPORT",
@@ -92,7 +94,6 @@ async def generate_report(
         "date_of_examination": date_of_examination,
     }
 
-    # Build context — fall back to image metadata if no OCR text
     if not all_texts:
         exhibits_desc = "\n".join(
             f"  Exhibit {ev.exhibit_ref}: {ev.original_filename} — {ev.file_type}, "
@@ -101,23 +102,16 @@ async def generate_report(
         )
         combined_text = (
             f"Visual forensic evidence submitted for examination.\n"
-            f"Case: {case.title}\n"
-            f"Case Number: {case.case_number}\n\n"
+            f"Case: {case.title}\nCase Number: {case.case_number}\n\n"
             f"Submitted Exhibits (image-based crime scene photographs):\n{exhibits_desc}\n\n"
-            f"Examination Note:\n"
             f"These exhibits are photographic forensic evidence captured at the crime scene. "
-            f"OCR text extraction was not applicable as these are images. "
-            f"Each image should be treated as a physical exhibit requiring visual forensic "
-            f"examination — analysis of scene layout, physical evidence visible, damage patterns, "
-            f"trace evidence, body position, environmental conditions, and any other forensically "
-            f"relevant features observable in the photographs."
+            f"Each image should be treated as a physical exhibit requiring visual forensic examination."
         )
         confidence = 0.55
         docs = []
     else:
-        # Mix of text + images
         if image_only:
-            all_texts.append("=== ADDITIONAL IMAGE EXHIBITS (crime scene photographs) ===")
+            all_texts.append("=== ADDITIONAL IMAGE EXHIBITS ===")
             for ev in image_only:
                 all_texts.append(f"Exhibit {ev.exhibit_ref}: {ev.original_filename} ({ev.file_type})")
         combined_text = "\n\n".join(all_texts)
@@ -128,21 +122,20 @@ async def generate_report(
         )
 
     report_data = await generator.generate(combined_text, filenames, case_meta)
-
-    # Attach SHA-256 hashes
+    report_data["ai_generated"] = True
     report_data["evidence_hashes"] = [
-        {
-            "exhibit_ref": ev.exhibit_ref,
-            "filename": ev.original_filename,
-            "sha256": ev.sha256_hash,
-            "size_bytes": ev.file_size,
-        }
+        {"exhibit_ref": ev.exhibit_ref, "filename": ev.original_filename,
+         "sha256": ev.sha256_hash, "size_bytes": ev.file_size}
         for ev in evidence_list
     ]
+
+    # Version: count existing reports for this case
+    existing_count = db.query(Report).filter(Report.case_id == case_id).count()
 
     report = Report(
         case_id=case_id,
         report_number=gen_report_number(),
+        version=existing_count + 1,
         status=ReportStatus.AI_DRAFT,
         report_data=json.dumps(report_data),
         confidence_score=round(float(confidence) * 100, 2),
@@ -157,7 +150,8 @@ async def generate_report(
 
     log_action(db, AuditAction.REPORT_GENERATED, user_id=current_user.id,
                case_id=case_id, report_id=report.id,
-               details={"report_number": report.report_number}, ip=get_client_ip(request))
+               details={"report_number": report.report_number, "version": report.version},
+               ip=get_client_ip(request))
 
     return ReportOut.from_orm_custom(report)
 
@@ -211,6 +205,7 @@ async def review_report(
     report_id: str,
     request: Request,
     action: str = Form(...),
+    outcome: Optional[str] = Form(None),
     comments: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.REVIEWER)),
@@ -226,9 +221,17 @@ async def review_report(
     report.reviewer_comments = comments
     report.reviewed_at = now
 
+    if outcome:
+        try:
+            report.review_outcome = ReviewOutcome(outcome)
+        except ValueError:
+            pass
+
     if action == "approve":
         report.status = ReportStatus.APPROVED
         report.approved_at = now
+        if not report.review_outcome:
+            report.review_outcome = ReviewOutcome.APPROVED
         audit_action = AuditAction.REPORT_APPROVED
     elif action == "reject":
         report.status = ReportStatus.NEEDS_CORRECTION
@@ -239,7 +242,7 @@ async def review_report(
     db.commit()
     log_action(db, audit_action, user_id=current_user.id,
                case_id=case_id, report_id=report_id,
-               details={"comments": comments}, ip=get_client_ip(request))
+               details={"comments": comments, "outcome": outcome}, ip=get_client_ip(request))
     return {"message": f"Report {action}d", "status": report.status}
 
 
@@ -262,7 +265,6 @@ async def export_pdf(
     report_data = json.loads(report.report_data)
 
     pdf_bytes = generate_pdf(report, report_data, case, reviewer)
-
     report.status = ReportStatus.EXPORTED
     report.exported_at = datetime.now(timezone.utc)
     db.commit()

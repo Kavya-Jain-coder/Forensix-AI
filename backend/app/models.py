@@ -17,6 +17,25 @@ class UserRole(str, enum.Enum):
     REVIEWER = "reviewer"
 
 
+class CaseType(str, enum.Enum):
+    HOMICIDE = "homicide"
+    CYBERCRIME = "cybercrime"
+    FRAUD = "fraud"
+    NARCOTICS = "narcotics"
+    MISSING_PERSON = "missing_person"
+    SEXUAL_ASSAULT = "sexual_assault"
+    ROBBERY = "robbery"
+    TERRORISM = "terrorism"
+    OTHER = "other"
+
+
+class CasePriority(str, enum.Enum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 class CaseStatus(str, enum.Enum):
     OPEN = "open"
     UNDER_REVIEW = "under_review"
@@ -32,6 +51,15 @@ class ReportStatus(str, enum.Enum):
     EXPORTED = "exported"
 
 
+class ReviewOutcome(str, enum.Enum):
+    APPROVED = "approved"
+    NEEDS_CLARIFICATION = "needs_clarification"
+    OCR_CORRECTION_REQUIRED = "ocr_correction_required"
+    EVIDENCE_MISSING = "evidence_missing"
+    METHODOLOGY_ISSUE = "methodology_issue"
+    LEGAL_EXPORT_ISSUE = "legal_export_issue"
+
+
 class AuditAction(str, enum.Enum):
     USER_LOGIN = "user_login"
     USER_LOGOUT = "user_logout"
@@ -39,6 +67,8 @@ class AuditAction(str, enum.Enum):
     CASE_UPDATED = "case_updated"
     EVIDENCE_UPLOADED = "evidence_uploaded"
     EVIDENCE_ACCESSED = "evidence_accessed"
+    EVIDENCE_INTEGRITY_CHECKED = "evidence_integrity_checked"
+    OCR_CORRECTED = "ocr_corrected"
     REPORT_GENERATED = "report_generated"
     REPORT_EDITED = "report_edited"
     REPORT_SUBMITTED = "report_submitted"
@@ -71,6 +101,13 @@ class Case(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(SAEnum(CaseStatus), default=CaseStatus.OPEN)
+    case_type = Column(SAEnum(CaseType), default=CaseType.OTHER)
+    priority = Column(SAEnum(CasePriority), default=CasePriority.MEDIUM)
+    fir_number = Column(String(80), nullable=True)
+    investigating_agency = Column(String(120), nullable=True)
+    court_deadline = Column(DateTime(timezone=True), nullable=True)
+    submission_date = Column(DateTime(timezone=True), nullable=True)
+    evidence_received_date = Column(DateTime(timezone=True), nullable=True)
     assigned_officer_id = Column(String, ForeignKey("users.id"), nullable=True)
     created_by_id = Column(String, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -93,14 +130,22 @@ class Evidence(Base):
     file_type = Column(String(100), nullable=False)
     file_size = Column(Integer, nullable=False)
     sha256_hash = Column(String(64), nullable=False)
+    raw_ocr_text = Column(Text, nullable=True)
     extracted_text = Column(Text, nullable=True)
     ocr_corrected = Column(Boolean, default=False)
+    ocr_corrected_by_id = Column(String, ForeignKey("users.id"), nullable=True)
+    ocr_corrected_at = Column(DateTime(timezone=True), nullable=True)
+    ocr_correction_reason = Column(Text, nullable=True)
+    integrity_verified = Column(Boolean, default=False)
+    last_integrity_check = Column(DateTime(timezone=True), nullable=True)
+    integrity_status = Column(String(20), nullable=True)
     uploaded_by_id = Column(String, ForeignKey("users.id"), nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
     storage_path = Column(String(500), nullable=False)
 
     case = relationship("Case", back_populates="evidence")
-    uploaded_by = relationship("User")
+    uploaded_by = relationship("User", foreign_keys=[uploaded_by_id])
+    ocr_corrected_by = relationship("User", foreign_keys=[ocr_corrected_by_id])
     custody_chain = relationship("ChainOfCustody", back_populates="evidence", order_by="ChainOfCustody.timestamp")
 
 
@@ -123,8 +168,10 @@ class Report(Base):
     id = Column(String, primary_key=True, default=gen_id)
     case_id = Column(String, ForeignKey("cases.id"), nullable=False)
     report_number = Column(String(60), nullable=False)
+    version = Column(Integer, default=1)
     status = Column(SAEnum(ReportStatus), default=ReportStatus.AI_DRAFT)
-    report_data = Column(Text, nullable=False)  # JSON string
+    review_outcome = Column(SAEnum(ReviewOutcome), nullable=True)  # structured outcome
+    report_data = Column(Text, nullable=False)
     confidence_score = Column(Float, nullable=True)
     generated_by_id = Column(String, ForeignKey("users.id"), nullable=False)
     reviewed_by_id = Column(String, ForeignKey("users.id"), nullable=True)
@@ -136,10 +183,12 @@ class Report(Base):
     officer_in_charge = Column(String(120), nullable=True)
     submitted_by = Column(String(120), nullable=True)
     date_of_examination = Column(String(40), nullable=True)
+    parent_report_id = Column(String, ForeignKey("reports.id"), nullable=True)
 
     case = relationship("Case", back_populates="reports")
     generated_by = relationship("User", foreign_keys=[generated_by_id])
     reviewed_by = relationship("User", foreign_keys=[reviewed_by_id])
+    versions = relationship("Report", foreign_keys=[parent_report_id])
 
 
 class AuditLog(Base):
@@ -150,7 +199,7 @@ class AuditLog(Base):
     case_id = Column(String, ForeignKey("cases.id"), nullable=True)
     evidence_id = Column(String, nullable=True)
     report_id = Column(String, nullable=True)
-    details = Column(Text, nullable=True)  # JSON string
+    details = Column(Text, nullable=True)
     ip_address = Column(String(45), nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
