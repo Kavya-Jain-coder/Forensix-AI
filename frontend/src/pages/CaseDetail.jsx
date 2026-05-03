@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth, canGenerate, canReview, canUpload } from '../context/AuthContext';
-import { ArrowLeft, Upload, FileText, Hash, Eye, Edit3, Send, CheckCircle, XCircle, Download, Clock, AlertCircle, X, Image } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Hash, Eye, Edit3, Send, CheckCircle, XCircle, Download, Clock, AlertCircle, X, Image, ExternalLink } from 'lucide-react';
 import ReportView from '../components/ReportView';
 
 const statusConfig = {
@@ -12,7 +12,7 @@ const statusConfig = {
 };
 
 export default function CaseDetail({ caseData, onBack }) {
-  const { user, authFetch } = useAuth();
+  const { user, authFetch, apiBase, token } = useAuth();
   const [evidence, setEvidence] = useState([]);
   const [reports, setReports] = useState([]);
   const [activeTab, setActiveTab] = useState('evidence');
@@ -29,10 +29,27 @@ export default function CaseDetail({ caseData, onBack }) {
   const [caseDetails, setCaseDetails] = useState({ officer_in_charge: '', submitted_by: '', date_of_examination: new Date().toISOString().split('T')[0] });
   const fileInputRef = useRef(null);
 
+  const [imageUrls, setImageUrls] = useState({});
+
   useEffect(() => {
     loadEvidence();
     loadReports();
   }, [caseData.id]);
+
+  // Load authenticated blob URLs for images
+  useEffect(() => {
+    evidence.forEach(ev => {
+      if (ev.file_type?.startsWith('image/') && !imageUrls[ev.id]) {
+        authFetch(`/api/cases/${caseData.id}/evidence/${ev.id}/file`)
+          .then(r => r.blob())
+          .then(blob => {
+            const url = URL.createObjectURL(blob);
+            setImageUrls(prev => ({ ...prev, [ev.id]: url }));
+          })
+          .catch(() => {});
+      }
+    });
+  }, [evidence]);
 
   const loadEvidence = () =>
     authFetch(`/api/cases/${caseData.id}/evidence`).then(r => r.json()).then(setEvidence).catch(console.error);
@@ -167,38 +184,81 @@ export default function CaseDetail({ caseData, onBack }) {
             <p className="text-center text-slate-500 py-8">No evidence uploaded yet.</p>
           ) : (
             <div className="space-y-3">
-              {evidence.map(ev => (
-                <div key={ev.id} className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-cyan-400 text-sm font-bold">{ev.exhibit_ref}</span>
-                        {ev.ocr_corrected && <span className="text-xs px-1.5 py-0.5 bg-green-500/10 border border-green-500/20 text-green-400 rounded">OCR Corrected</span>}
+              {evidence.map(ev => {
+                const isImage = ev.file_type?.startsWith('image/');
+                const fileUrl = `${apiBase}/api/cases/${caseData.id}/evidence/${ev.id}/file`;
+                return (
+                  <div key={ev.id} className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+                    {/* Image preview */}
+                    {isImage && imageUrls[ev.id] && (
+                      <div className="bg-slate-900/50 border-b border-slate-700 flex items-center justify-center" style={{maxHeight: '280px', overflow: 'hidden'}}>
+                        <img
+                          src={imageUrls[ev.id]}
+                          alt={ev.original_filename}
+                          style={{maxHeight: '280px', maxWidth: '100%', objectFit: 'contain'}}
+                          className="w-full"
+                        />
                       </div>
-                      <p className="text-sm text-slate-300 truncate">{ev.original_filename}</p>
-                      <p className="text-xs text-slate-500 mt-1">{ev.file_type} · {(ev.file_size / 1024).toFixed(1)} KB · {new Date(ev.uploaded_at).toLocaleString()}</p>
-                      <div className="flex items-center gap-1 mt-2">
-                        <Hash size={12} className="text-slate-500" />
-                        <span className="text-xs font-mono text-slate-500 truncate">{ev.sha256_hash}</span>
+                    )}
+                    {isImage && !imageUrls[ev.id] && (
+                      <div className="bg-slate-900/50 border-b border-slate-700 flex items-center justify-center h-24">
+                        <p className="text-xs text-slate-500">Loading image...</p>
                       </div>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      {ev.extracted_text && (
-                        <button onClick={() => setSelectedEvidence(ev)}
-                          className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors" title="Preview OCR text">
-                          <Eye size={15} />
-                        </button>
-                      )}
-                      {canUpload(user) && (
-                        <button onClick={() => { setEditingOcr(ev); setOcrText(ev.extracted_text || ''); }}
-                          className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors" title="Edit OCR text">
-                          <Edit3 size={15} />
-                        </button>
-                      )}
+                    )}
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-mono text-cyan-400 text-sm font-bold">{ev.exhibit_ref}</span>
+                            {ev.ocr_corrected && <span className="text-xs px-1.5 py-0.5 bg-green-500/10 border border-green-500/20 text-green-400 rounded">OCR Corrected</span>}
+                            {isImage && <span className="text-xs px-1.5 py-0.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded">Image</span>}
+                          </div>
+                          <p className="text-sm text-slate-300 truncate">{ev.original_filename}</p>
+                          <p className="text-xs text-slate-500 mt-1">{ev.file_type} · {(ev.file_size / 1024).toFixed(1)} KB · {new Date(ev.uploaded_at).toLocaleString()}</p>
+                          <div className="flex items-center gap-1 mt-2">
+                            <Hash size={12} className="text-slate-500" />
+                            <span className="text-xs font-mono text-slate-500 truncate">{ev.sha256_hash}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          {/* View/download file */}
+                          <a
+                            href={imageUrls[ev.id] || '#'}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={async (e) => {
+                              if (!isImage) {
+                                e.preventDefault();
+                                const res = await authFetch(`/api/cases/${caseData.id}/evidence/${ev.id}/file`);
+                                const blob = await res.blob();
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url; a.download = ev.original_filename; a.click();
+                              }
+                            }}
+                            className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
+                            title={isImage ? 'View full image' : 'Download file'}
+                          >
+                            <ExternalLink size={15} />
+                          </a>
+                          {ev.extracted_text && (
+                            <button onClick={() => setSelectedEvidence(ev)}
+                              className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors" title="Preview OCR text">
+                              <Eye size={15} />
+                            </button>
+                          )}
+                          {canUpload(user) && (
+                            <button onClick={() => { setEditingOcr(ev); setOcrText(ev.extracted_text || ''); }}
+                              className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors" title="Edit OCR text">
+                              <Edit3 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Evidence, ChainOfCustody, Case, UserRole, AuditAction, User
@@ -275,6 +276,33 @@ async def verify_integrity(
         "checked_at": ev.last_integrity_check.isoformat(),
         "message": "File integrity verified — hash matches original." if match else "WARNING: File hash does not match. Evidence may have been tampered with.",
     }
+
+
+@router.get("/{evidence_id}/file")
+async def serve_evidence_file(
+    case_id: str,
+    evidence_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ev = db.query(Evidence).filter(Evidence.id == evidence_id, Evidence.case_id == case_id).first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+    if not os.path.exists(ev.storage_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    db.add(ChainOfCustody(
+        evidence_id=ev.id, action="FILE_VIEWED",
+        performed_by_id=current_user.id,
+        notes=f"Evidence file viewed by {current_user.full_name} ({current_user.role.value})",
+        ip_address=get_client_ip(request),
+    ))
+    db.commit()
+    return FileResponse(
+        path=ev.storage_path,
+        media_type=ev.file_type,
+        filename=ev.original_filename,
+    )
 
 
 @router.get("/{evidence_id}/custody", response_model=List[CustodyEventOut])
