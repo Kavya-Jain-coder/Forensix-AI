@@ -120,7 +120,7 @@ async def list_cases(
     current_user: User = Depends(get_current_user),
 ):
     q = db.query(Case)
-    if current_user.role != UserRole.ADMIN:
+    if current_user.role == UserRole.INVESTIGATOR:
         q = q.filter(
             (Case.created_by_id == current_user.id) |
             (Case.assigned_officer_id == current_user.id)
