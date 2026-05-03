@@ -375,7 +375,12 @@ export default function CaseDetail({ caseData, onBack }) {
                   </div>
                 )}
 
-                <ReportView report={{ ...selectedReport.report_data, confidence_score: selectedReport.confidence_score }} />
+                <ReportView report={{ 
+                  ...selectedReport.report_data, 
+                  confidence_score: selectedReport.confidence_score,
+                  status: selectedReport.status,
+                  onExportPdf: selectedReport.status === 'approved' ? () => handleExportPdf(selectedReport.id) : null
+                }} />
               </div>
             ) : (
               <div className="h-64 border-2 border-dashed border-slate-700 rounded-xl flex items-center justify-center text-slate-500">

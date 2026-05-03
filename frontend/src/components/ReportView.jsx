@@ -78,14 +78,6 @@ export default function ReportView({ report }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleExport = () => {
-    const blob = new Blob([generatePlainText()], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${report.report_number?.replace(/\//g, '-') || 'forensic-report'}.txt`;
-    a.click();
-  };
-
   const Section = ({ icon, title, children }) => (
     <div className="bg-slate-800/50 rounded-xl border border-slate-700 backdrop-blur p-6">
       <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -114,11 +106,19 @@ export default function ReportView({ report }) {
             </div>
             <div className="flex gap-2">
               <button onClick={handleCopy} className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white text-sm transition-colors">
-                <Copy size={15} />{copied ? 'Copied!' : 'Copy'}
+                <Copy size={15} />{copied ? 'Copied!' : 'Copy Text'}
               </button>
-              <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 rounded-lg text-blue-400 text-sm transition-colors">
-                <Download size={15} />Export
-              </button>
+              {report.status === 'approved' || report.status === 'exported' ? (
+                report.onExportPdf ? (
+                  <button onClick={report.onExportPdf} className="flex items-center gap-2 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 rounded-lg text-green-400 text-sm transition-colors font-medium">
+                    <Download size={15} />Export PDF
+                  </button>
+                ) : null
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/20 rounded-lg text-slate-500 text-xs">
+                  <Download size={14} />PDF available after approval
+                </div>
+              )}
             </div>
           </div>
 
