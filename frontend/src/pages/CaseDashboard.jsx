@@ -137,7 +137,7 @@ export default function CaseDashboard({ onSelectCase }) {
         ))}
       </div>
 
-      {/* Cases Table */}
+      {/* Cases — table on desktop, cards on mobile */}
       {loading ? (
         <p className="text-slate-400 text-sm text-center py-8">Loading cases...</p>
       ) : cases.length === 0 ? (
@@ -146,75 +146,105 @@ export default function CaseDashboard({ onSelectCase }) {
           <p className="text-sm">No cases found. {search || filterStatus ? 'Try clearing filters.' : 'Create your first case.'}</p>
         </div>
       ) : (
-        <div className="bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wide">
-                <th className="text-left px-4 py-2.5">Case</th>
-                <th className="text-left px-4 py-2.5 hidden md:table-cell">Type</th>
-                <th className="text-left px-4 py-2.5">Priority</th>
-                <th className="text-left px-4 py-2.5">Status</th>
-                {isAdmin(user) && <th className="text-left px-4 py-2.5">Created By</th>}
-                <th className="text-left px-4 py-2.5">Evidence</th>
-                <th className="text-left px-4 py-2.5">Report Status</th>
-                <th className="text-left px-4 py-2.5 hidden xl:table-cell">Created</th>
-                <th className="px-4 py-2.5"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {cases.map(c => {
-                const st = statusConfig[c.status] || statusConfig.open;
-                const pr = priorityConfig[c.priority] || priorityConfig.medium;
-                return (
-                  <tr key={c.id} className="hover:bg-slate-700/30 transition-colors group">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-white group-hover:text-cyan-300 transition-colors">{c.title}</p>
-                      <p className="text-xs text-slate-500 font-mono">{c.case_number}{c.fir_number ? ` · FIR: ${c.fir_number}` : ''}</p>
-                      {c.investigating_agency && <p className="text-xs text-slate-600">{c.investigating_agency}</p>}
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      <span className="text-xs text-slate-400">{c.case_type?.replace('_', ' ').toUpperCase() || '—'}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${pr}`}>
-                        {c.priority?.toUpperCase() || '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${st.color}`}>{st.label}</span>
-                    </td>
-                    {isAdmin(user) && (
+        <>
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-3">
+            {cases.map(c => {
+              const st = statusConfig[c.status] || statusConfig.open;
+              const pr = priorityConfig[c.priority] || priorityConfig.medium;
+              const rs = reportStatusConfig[c.report_status_summary] || reportStatusConfig.none;
+              return (
+                <div key={c.id} onClick={() => onSelectCase(c)}
+                  className="bg-slate-800/50 rounded-xl border border-slate-700 p-4 cursor-pointer active:bg-slate-700/50">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-white text-sm truncate">{c.title}</p>
+                      <p className="text-xs text-slate-500 font-mono">{c.case_number}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium flex-shrink-0 ${pr}`}>{c.priority?.toUpperCase()}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${st.color}`}>{st.label}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${rs.color}`}>{rs.label}</span>
+                    <span className="text-xs text-slate-500">{c.evidence_count} evidence</span>
+                  </div>
+                  {isAdmin(user) && c.created_by_name && (
+                    <p className="text-xs text-slate-500 mt-2">By: {c.created_by_name}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden sm:block bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wide">
+                  <th className="text-left px-4 py-2.5">Case</th>
+                  <th className="text-left px-4 py-2.5 hidden md:table-cell">Type</th>
+                  <th className="text-left px-4 py-2.5">Priority</th>
+                  <th className="text-left px-4 py-2.5">Status</th>
+                  {isAdmin(user) && <th className="text-left px-4 py-2.5">Created By</th>}
+                  <th className="text-left px-4 py-2.5">Evidence</th>
+                  <th className="text-left px-4 py-2.5">Report Status</th>
+                  <th className="text-left px-4 py-2.5 hidden xl:table-cell">Created</th>
+                  <th className="px-4 py-2.5"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {cases.map(c => {
+                  const st = statusConfig[c.status] || statusConfig.open;
+                  const pr = priorityConfig[c.priority] || priorityConfig.medium;
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-700/30 transition-colors group">
                       <td className="px-4 py-3">
-                        <span className="text-xs text-slate-300">{c.created_by_name || '—'}</span>
+                        <p className="font-medium text-white group-hover:text-cyan-300 transition-colors">{c.title}</p>
+                        <p className="text-xs text-slate-500 font-mono">{c.case_number}{c.fir_number ? ` · FIR: ${c.fir_number}` : ''}</p>
+                        {c.investigating_agency && <p className="text-xs text-slate-600">{c.investigating_agency}</p>}
                       </td>
-                    )}
-                    <td className="px-4 py-3">
-                      {c.evidence_count === 0
-                        ? <span className="text-xs text-red-400">None uploaded</span>
-                        : <span className="text-xs text-slate-300">{c.evidence_count} file{c.evidence_count > 1 ? 's' : ''}</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3">
-                      {(() => {
-                        const rs = reportStatusConfig[c.report_status_summary] || reportStatusConfig.none;
-                        return <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${rs.color}`}>{rs.label}</span>;
-                      })()}
-                    </td>
-                    <td className="px-4 py-3 hidden xl:table-cell text-slate-500 text-xs">
-                      {new Date(c.created_at).toLocaleDateString('en-GB')}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => onSelectCase(c)}
-                        className="flex items-center gap-1 px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded text-xs transition-colors">
-                        <Eye size={12} /> Open
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <span className="text-xs text-slate-400">{c.case_type?.replace('_', ' ').toUpperCase() || '—'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${pr}`}>{c.priority?.toUpperCase() || '—'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${st.color}`}>{st.label}</span>
+                      </td>
+                      {isAdmin(user) && (
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-slate-300">{c.created_by_name || '—'}</span>
+                        </td>
+                      )}
+                      <td className="px-4 py-3">
+                        {c.evidence_count === 0
+                          ? <span className="text-xs text-red-400">None</span>
+                          : <span className="text-xs text-slate-300">{c.evidence_count} file{c.evidence_count > 1 ? 's' : ''}</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const rs = reportStatusConfig[c.report_status_summary] || reportStatusConfig.none;
+                          return <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${rs.color}`}>{rs.label}</span>;
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell text-slate-500 text-xs">
+                        {new Date(c.created_at).toLocaleDateString('en-GB')}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => onSelectCase(c)}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded text-xs transition-colors">
+                          <Eye size={12} /> Open
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Create Case Modal */}

@@ -38,40 +38,36 @@ function AppInner() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white">
-      <nav className="border-b border-slate-700 bg-slate-900/80 backdrop-blur-md px-6 py-3 flex justify-between items-center sticky top-0 z-40">
-        <div className="flex items-center gap-6">
+      <nav className="border-b border-slate-700 bg-slate-900/80 backdrop-blur-md px-3 sm:px-6 py-3 flex justify-between items-center sticky top-0 z-40">
+        <div className="flex items-center gap-2 sm:gap-6">
           <button onClick={() => { setSelectedCase(null); setAppPage('cases'); }} className="hover:opacity-80 transition-opacity">
-            <img src={forensixLogo} alt="ForensixAI" className="h-10 w-auto object-contain" />
+            <img src={forensixLogo} alt="ForensixAI" className="h-8 sm:h-10 w-auto object-contain" />
           </button>
           <div className="flex gap-1">
             <button onClick={() => { setSelectedCase(null); setAppPage('cases'); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${appPage === 'cases' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
-              <FolderOpen size={14} /> Cases
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors ${appPage === 'cases' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
+              <FolderOpen size={13} /> <span className="hidden sm:inline">Cases</span>
             </button>
             {isAdmin(user) && (
               <button onClick={() => setAppPage('admin')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${appPage === 'admin' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
-                <Shield size={14} /> Admin
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-colors ${appPage === 'admin' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
+                <Shield size={13} /> <span className="hidden sm:inline">Admin</span>
               </button>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`text-xs px-2 py-1 rounded-full border font-medium ${roleColors[user.role] || 'text-slate-400'}`}>
+        <div className="flex items-center gap-2">
+          <span className={`hidden sm:inline text-xs px-2 py-1 rounded-full border font-medium ${roleColors[user.role] || 'text-slate-400'}`}>
             {user.role.replace('_', ' ').toUpperCase()}
           </span>
-          <div className="flex items-center gap-2 text-sm text-slate-300">
-            <User size={15} className="text-slate-500" />
-            <span>{user.full_name}</span>
-            {user.badge_number && <span className="text-slate-500 text-xs">#{user.badge_number}</span>}
-          </div>
-          <button onClick={logout} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white text-sm transition-colors">
-            <LogOut size={14} /> Sign Out
+          <span className="text-xs sm:text-sm text-slate-300 hidden md:inline">{user.full_name}</span>
+          <button onClick={logout} className="flex items-center gap-1 px-2 sm:px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white text-xs sm:text-sm transition-colors">
+            <LogOut size={13} /> <span className="hidden sm:inline">Sign Out</span>
           </button>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {appPage === 'admin' && isAdmin(user) ? (
           <AdminPanel />
         ) : selectedCase ? (
