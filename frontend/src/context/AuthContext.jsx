@@ -14,7 +14,12 @@ export function AuthProvider({ children }) {
       fetch(`${API}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.ok ? r.json() : null)
         .then(u => { setUser(u); setLoading(false); })
-        .catch(() => { logout(); setLoading(false); });
+        .catch(() => {
+          localStorage.removeItem('forensix_token');
+          setToken(null);
+          setUser(null);
+          setLoading(false);
+        });
     } else {
       setLoading(false);
     }

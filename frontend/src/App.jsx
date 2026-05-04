@@ -19,7 +19,7 @@ function AppInner() {
   const { user, logout, loading } = useAuth();
   const [page, setPage] = useState('home');
   const [selectedCase, setSelectedCase] = useState(null);
-  const [appPage, setAppPage] = useState('cases'); // 'cases' | 'admin'
+  const [appPage, setAppPage] = useState('cases');
 
   if (loading) {
     return (
