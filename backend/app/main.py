@@ -1,25 +1,25 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-import os, sys
+import os
+import sys
+
 _secret = os.getenv("SECRET_KEY", "")
 if not _secret:
-    print("[FATAL] SECRET_KEY is not set in .env. Refusing to start.", file=sys.stderr)
+    print("[FATAL] SECRET_KEY is not set. Refusing to start.", file=sys.stderr)
     sys.exit(1)
 if _secret == "forensix-secret-change-in-production-32chars":
-    print("[WARNING] Using default SECRET_KEY. Change it in .env before deploying.", file=sys.stderr)
+    print("[WARNING] Using default SECRET_KEY. Change it before deploying.", file=sys.stderr)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine
 from app import models
-from app.routes import auth, cases, evidence, reports, audit
-from app.routes import api, forensic
-import os
+from app.routes import auth, cases, evidence, reports, audit, api, forensic
 
 models.Base.metadata.create_all(bind=engine)
 
-# Auto-seed admin on first startup
+
 def seed_admin():
     from app.database import SessionLocal
     from app.models import User, UserRole
@@ -44,6 +44,7 @@ def seed_admin():
     finally:
         db.close()
 
+
 seed_admin()
 
 app = FastAPI(title="ForensixAI API", version="2.0.0")
@@ -64,7 +65,7 @@ app.include_router(evidence.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(forensic.router, prefix="/api")
-app.include_router(api.router, prefix="/api")  # legacy
+app.include_router(api.router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
