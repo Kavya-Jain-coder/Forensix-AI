@@ -5,7 +5,8 @@ import CaseDashboard from './pages/CaseDashboard';
 import CaseDetail from './pages/CaseDetail';
 import AdminPanel from './pages/AdminPanel';
 import Home from './components/Home';
-import { LogOut, User, Shield, FolderOpen } from 'lucide-react';
+import NotificationsPanel from './components/NotificationsPanel';
+import { LogOut, User, Shield, FolderOpen, Search } from 'lucide-react';
 import forensixLogo from './assets/forensix-logo.png';
 
 const roleColors = {
@@ -61,6 +62,7 @@ function AppInner() {
             {user.role.replace('_', ' ').toUpperCase()}
           </span>
           <span className="text-xs sm:text-sm text-slate-300 hidden md:inline">{user.full_name}</span>
+          <NotificationsPanel />
           <button onClick={logout} className="flex items-center gap-1 px-2 sm:px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white text-xs sm:text-sm transition-colors">
             <LogOut size={13} /> <span className="hidden sm:inline">Sign Out</span>
           </button>

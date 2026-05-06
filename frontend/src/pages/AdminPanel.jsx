@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserPlus, Users, ShieldCheck, Clock, X, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Users, ShieldCheck, Clock, X, CheckCircle, XCircle, Eye, EyeOff, Search, BarChart2 } from 'lucide-react';
+import CrossCaseSearch from '../components/CrossCaseSearch';
+import MetricsDashboard from '../components/MetricsDashboard';
 
 const roleColors = {
   admin: 'text-red-400 bg-red-500/10 border-red-500/30',
@@ -133,6 +135,8 @@ export default function AdminPanel() {
           { key: 'users', label: `All Users (${users.length})`, icon: Users },
           { key: 'logins', label: `Recent Logins (${loginLogs.length})`, icon: Clock },
           { key: 'audit', label: 'Audit Log', icon: ShieldCheck },
+          { key: 'search', label: 'Cross-Case Search', icon: Search },
+          { key: 'metrics', label: 'Metrics', icon: BarChart2 },
         ].map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setActiveTab(key)}
             className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === key ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
@@ -241,6 +245,9 @@ export default function AdminPanel() {
           })}
         </div>
       )}
+
+      {activeTab === 'search' && <CrossCaseSearch />}
+      {activeTab === 'metrics' && <MetricsDashboard />}
 
       {/* Add User Modal */}
       {showAddUser && (

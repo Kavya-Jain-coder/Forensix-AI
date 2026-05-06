@@ -4,6 +4,17 @@ const AuthContext = createContext(null);
 
 const API = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:8001';
 
+async function requestWithContext(url, options) {
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(`Network error reaching ${url}`);
+    }
+    throw error;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('forensix_token'));
@@ -11,7 +22,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (token) {
-      fetch(`${API}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      requestWithContext(`${API}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.ok ? r.json() : null)
         .then(u => { setUser(u); setLoading(false); })
         .catch(() => {
@@ -27,7 +38,7 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     const form = new URLSearchParams({ username, password });
-    const res = await fetch(`${API}/api/auth/login`, {
+    const res = await requestWithContext(`${API}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form,
@@ -50,7 +61,7 @@ export function AuthProvider({ children }) {
   };
 
   const authFetch = async (url, options = {}) => {
-    const res = await fetch(`${API}${url}`, {
+    const res = await requestWithContext(`${API}${url}`, {
       ...options,
       headers: { Authorization: `Bearer ${token}`, ...options.headers },
     });
