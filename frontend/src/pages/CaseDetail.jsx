@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth, canGenerate, canReview, canUpload } from '../context/AuthContext';
-import { ArrowLeft, Upload, FileText, Hash, Eye, Edit3, Send, CheckCircle, XCircle, Download, Clock, AlertCircle, X, Image, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Hash, Eye, Edit3, Send, CheckCircle, XCircle, Download, Clock, AlertCircle, X, Image, ExternalLink, ShieldCheck, GitBranch, Activity, QrCode, Scissors, Award, Package, ClipboardList, ListTodo } from 'lucide-react';
 import ReportView from '../components/ReportView';
+import IntakeChecklist from '../components/IntakeChecklist';
+import TasksPanel from '../components/TasksPanel';
+import EvidenceLabelModal from '../components/EvidenceLabelModal';
+import RedactionModal from '../components/RedactionModal';
 
 const statusConfig = {
   ai_draft: { label: 'AI Draft', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
@@ -30,11 +34,22 @@ export default function CaseDetail({ caseData, onBack }) {
   const fileInputRef = useRef(null);
 
   const [imageUrls, setImageUrls] = useState({});
+  const [timeline, setTimeline] = useState([]);
+  const [custody, setCustody] = useState({});
+  const [integrity, setIntegrity] = useState({});
+  const [verifying, setVerifying] = useState({});
+  const [showLabels, setShowLabels] = useState(false);
+  const [redactingReport, setRedactingReport] = useState(null);
+  const [certificate, setCertificate] = useState(null);
+  const [packageTypes, setPackageTypes] = useState([]);
+  const [exportingPackage, setExportingPackage] = useState('');
 
   useEffect(() => {
     loadEvidence();
     loadReports();
-  }, [caseData.id]);
+    loadTimeline();
+    authFetch(`/api/cases/${caseData.id}/package-types`).then(r => r.json()).then(setPackageTypes).catch(() => {});
+  }, [caseData.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load authenticated blob URLs for images
   useEffect(() => {
@@ -49,7 +64,42 @@ export default function CaseDetail({ caseData, onBack }) {
           .catch(() => {});
       }
     });
-  }, [evidence]);
+  }, [evidence]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadTimeline = () =>
+    authFetch(`/api/cases/${caseData.id}/timeline`).then(r => r.json()).then(setTimeline).catch(console.error);
+
+  const loadCustody = (evidenceId) =>
+    authFetch(`/api/cases/${caseData.id}/evidence/${evidenceId}/custody`)
+      .then(r => r.json())
+      .then(data => setCustody(prev => ({ ...prev, [evidenceId]: data })))
+      .catch(console.error);
+
+  const handleVerifyIntegrity = async (evidenceId) => {
+    setVerifying(prev => ({ ...prev, [evidenceId]: true }));
+    try {
+      const res = await authFetch(`/api/cases/${caseData.id}/evidence/${evidenceId}/verify-integrity`, { method: 'POST' });
+      const data = await res.json();
+      setIntegrity(prev => ({ ...prev, [evidenceId]: data }));
+      loadEvidence();
+    } catch (e) { console.error(e); }
+    finally { setVerifying(prev => ({ ...prev, [evidenceId]: false })); }
+  };
+
+  const loadCertificate = async (reportId) => {
+    const res = await authFetch(`/api/cases/${caseData.id}/reports/${reportId}/certificate`);
+    if (res.ok) setCertificate(await res.json());
+  };
+
+  const handleExportPackage = async (reportId, pkgType) => {
+    setExportingPackage(pkgType);
+    const res = await authFetch(`/api/cases/${caseData.id}/reports/${reportId}/export/${pkgType}`);
+    if (!res.ok) { const e = await res.json(); setError(e.detail); setExportingPackage(''); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `report-${pkgType}.pdf`; a.click();
+    setExportingPackage('');
+  };
 
   const loadEvidence = () =>
     authFetch(`/api/cases/${caseData.id}/evidence`).then(r => r.json()).then(setEvidence).catch(console.error);
@@ -100,10 +150,10 @@ export default function CaseDetail({ caseData, onBack }) {
     if (selectedReport?.id === reportId) setSelectedReport(prev => ({ ...prev, status: 'under_review' }));
   };
 
-  const handleReview = async (reportId) => {
+  const handleReview = async (reportId, action) => {
     setReviewing(true);
     const form = new FormData();
-    form.append('action', reviewAction);
+    form.append('action', action);
     if (reviewComments) form.append('comments', reviewComments);
     try {
       const res = await authFetch(`/api/cases/${caseData.id}/reports/${reportId}/review`, { method: 'PATCH', body: form });
@@ -152,11 +202,11 @@ export default function CaseDetail({ caseData, onBack }) {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-800/50 p-1 rounded-lg border border-slate-700 w-fit">
-        {['evidence', 'generate', 'reports'].map(tab => (
+      <div className="flex gap-1 bg-slate-800/50 p-1 rounded-lg border border-slate-700 w-fit flex-wrap">
+        {['evidence', 'chain-of-custody', 'timeline', 'tasks', 'generate', 'reports'].map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${activeTab === tab ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>
-            {tab === 'reports' ? `Reports (${reports.length})` : tab === 'evidence' ? `Evidence (${evidence.length})` : tab}
+            {tab === 'reports' ? `Reports (${reports.length})` : tab === 'evidence' ? `Evidence (${evidence.length})` : tab === 'chain-of-custody' ? 'Chain of Custody' : tab === 'timeline' ? 'Timeline' : tab === 'tasks' ? 'Tasks' : tab}
           </button>
         ))}
       </div>
@@ -180,6 +230,15 @@ export default function CaseDetail({ caseData, onBack }) {
             </div>
           )}
 
+          {evidence.length > 0 && (
+            <div className="flex justify-end">
+              <button onClick={() => setShowLabels(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 rounded-lg text-xs font-medium transition-colors">
+                <QrCode size={13} /> Print Evidence Labels
+              </button>
+            </div>
+          )}
+
           {evidence.length === 0 ? (
             <p className="text-center text-slate-500 py-8">No evidence uploaded yet.</p>
           ) : (
@@ -189,7 +248,6 @@ export default function CaseDetail({ caseData, onBack }) {
                 const fileUrl = `${apiBase}/api/cases/${caseData.id}/evidence/${ev.id}/file`;
                 return (
                   <div key={ev.id} className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
-                    {/* Image preview */}
                     {isImage && imageUrls[ev.id] && (
                       <div className="bg-slate-900/50 border-b border-slate-700 flex items-center justify-center" style={{maxHeight: '280px', overflow: 'hidden'}}>
                         <img
@@ -264,6 +322,16 @@ export default function CaseDetail({ caseData, onBack }) {
         </div>
       )}
 
+      {/* Tasks Tab */}
+      {activeTab === 'tasks' && (
+        <div className="max-w-lg">
+          <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2"><ListTodo size={15} /> Case Tasks</h3>
+            <TasksPanel caseId={caseData.id} />
+          </div>
+        </div>
+      )}
+
       {/* Generate Tab */}
       {activeTab === 'generate' && (
         <div className="max-w-lg space-y-4">
@@ -292,6 +360,8 @@ export default function CaseDetail({ caseData, onBack }) {
                 </div>
               </div>
 
+              <IntakeChecklist caseId={caseData.id} />
+
               <div className="bg-slate-800/30 rounded-lg border border-slate-700 p-4">
                 <p className="text-xs text-slate-400">{evidence.length} evidence file(s) will be analysed. Report will be saved as <span className="text-cyan-400 font-medium">AI Draft</span> and must be submitted for review before export.</p>
               </div>
@@ -301,6 +371,106 @@ export default function CaseDetail({ caseData, onBack }) {
                 {generating ? 'Generating Report...' : <><FileText size={16} /> Generate Forensic Report</>}
               </button>
             </>
+          )}
+        </div>
+      )}
+
+      {/* Chain of Custody Tab */}
+      {activeTab === 'chain-of-custody' && (
+        <div className="space-y-4">
+          {evidence.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">No evidence uploaded yet.</p>
+          ) : evidence.map(ev => (
+            <div key={ev.id} className="bg-slate-800/50 rounded-xl border border-slate-700 p-4 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <span className="font-mono text-cyan-400 text-sm font-bold">{ev.exhibit_ref}</span>
+                  <span className="text-slate-400 text-xs ml-2">{ev.original_filename}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Integrity status badge */}
+                  {ev.integrity_status === 'VERIFIED' && <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 flex items-center gap-1"><ShieldCheck size={11} /> Verified</span>}
+                  {ev.integrity_status === 'TAMPERED' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center gap-1"><AlertCircle size={11} /> Tampered</span>}
+                  {ev.integrity_status === 'FILE_MISSING' && <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 flex items-center gap-1"><AlertCircle size={11} /> File Missing</span>}
+                  {(!ev.integrity_status || ev.integrity_status === 'PENDING') && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-500/10 border border-slate-500/30 text-slate-400">Not Verified</span>}
+                  <button
+                    onClick={() => { handleVerifyIntegrity(ev.id); loadCustody(ev.id); }}
+                    disabled={verifying[ev.id]}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50">
+                    <ShieldCheck size={13} /> {verifying[ev.id] ? 'Verifying...' : 'Verify Integrity'}
+                  </button>
+                  <button
+                    onClick={() => loadCustody(ev.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 rounded-lg text-xs font-medium transition-colors">
+                    <GitBranch size={13} /> Load Custody
+                  </button>
+                </div>
+              </div>
+
+              {/* Hash info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                <div className="bg-slate-900/50 rounded-lg p-3">
+                  <p className="text-slate-500 mb-1">Expected Hash (SHA-256)</p>
+                  <p className="font-mono text-slate-300 break-all">{ev.sha256_hash || '—'}</p>
+                </div>
+                <div className="bg-slate-900/50 rounded-lg p-3">
+                  <p className="text-slate-500 mb-1">Last Integrity Check</p>
+                  <p className="text-slate-300">{ev.last_integrity_check ? new Date(ev.last_integrity_check).toLocaleString() : '—'}</p>
+                  {integrity[ev.id] && (
+                    <p className={`mt-1 font-medium ${integrity[ev.id].match ? 'text-green-400' : 'text-red-400'}`}>
+                      {integrity[ev.id].match ? '✓ Hash match' : '✗ Hash mismatch'}
+                      {integrity[ev.id].current_hash && <span className="block font-mono text-slate-400 mt-1 break-all">Current: {integrity[ev.id].current_hash}</span>}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Custody chain */}
+              {custody[ev.id]?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-400 font-medium">Custody Events</p>
+                  <div className="space-y-1.5">
+                    {custody[ev.id].map((c, i) => (
+                      <div key={i} className="flex items-start gap-3 text-xs">
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 mt-1.5 flex-shrink-0" />
+                        <div>
+                          <span className="text-slate-300 font-medium">{c.action}</span>
+                          {c.performed_by_name && <span className="text-slate-500 ml-2">by {c.performed_by_name}</span>}
+                          {c.performed_by_role && <span className="text-slate-600 ml-1">({c.performed_by_role})</span>}
+                          {c.timestamp && <span className="text-slate-600 ml-2">{new Date(c.timestamp).toLocaleString()}</span>}
+                          {c.notes && <p className="text-slate-500 mt-0.5">{c.notes}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Timeline Tab */}
+      {activeTab === 'timeline' && (
+        <div className="space-y-3">
+          {timeline.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">No timeline events yet.</p>
+          ) : (
+            <div className="relative border-l border-slate-700 ml-3 space-y-4 pl-6">
+              {timeline.map((event, i) => (
+                <div key={i} className="relative">
+                  <div className="absolute -left-[1.65rem] w-3 h-3 rounded-full bg-cyan-500 border-2 border-slate-900" />
+                  <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-sm text-slate-200 font-medium">{event.action?.replace(/_/g, ' ')}</span>
+                      <span className="text-xs text-slate-500">{event.timestamp ? new Date(event.timestamp).toLocaleString() : ''}</span>
+                    </div>
+                    {event.user && <p className="text-xs text-slate-500 mt-1">by {event.user}{event.role ? ` · ${event.role}` : ''}</p>}
+                    {event.details && <p className="text-xs text-slate-400 mt-1">{typeof event.details === 'string' ? event.details : JSON.stringify(event.details)}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -348,12 +518,12 @@ export default function CaseDetail({ caseData, onBack }) {
                       <textarea rows={1} placeholder="Reviewer comments (optional)"
                         value={reviewComments} onChange={e => setReviewComments(e.target.value)}
                         className="px-2 py-1 bg-slate-900/60 border border-slate-600 rounded text-xs text-slate-200 focus:outline-none focus:border-cyan-500 w-48 resize-none" />
-                      <button onClick={() => { setReviewAction('approve'); handleReview(selectedReport.id); }}
+                      <button onClick={() => { setReviewAction('approve'); handleReview(selectedReport.id, 'approve'); }}
                         disabled={reviewing}
                         className="flex items-center gap-1 px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50">
                         <CheckCircle size={13} /> Approve
                       </button>
-                      <button onClick={() => { setReviewAction('reject'); handleReview(selectedReport.id); }}
+                      <button onClick={() => { setReviewAction('reject'); handleReview(selectedReport.id, 'reject'); }}
                         disabled={reviewing}
                         className="flex items-center gap-1 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 rounded-lg text-xs font-medium transition-colors disabled:opacity-50">
                         <XCircle size={13} /> Reject
@@ -361,13 +531,52 @@ export default function CaseDetail({ caseData, onBack }) {
                     </div>
                   )}
 
-                  {selectedReport.status === 'approved' && (
-                    <button onClick={() => handleExportPdf(selectedReport.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-medium transition-colors">
-                      <Download size={13} /> Export PDF
-                    </button>
+                  {['approved', 'exported'].includes(selectedReport.status) && (
+                    <>
+                      <button onClick={() => handleExportPdf(selectedReport.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-medium transition-colors">
+                        <Download size={13} /> Export PDF
+                      </button>
+                      <button onClick={() => loadCertificate(selectedReport.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-400 rounded-lg text-xs font-medium transition-colors">
+                        <Award size={13} /> Certificate
+                      </button>
+                      <button onClick={() => setRedactingReport(selectedReport)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/30 text-orange-400 rounded-lg text-xs font-medium transition-colors">
+                        <Scissors size={13} /> Redact
+                      </button>
+                      {packageTypes.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {packageTypes.map(pkg => (
+                            <button key={pkg.key}
+                              onClick={() => handleExportPackage(selectedReport.id, pkg.key)}
+                              disabled={exportingPackage === pkg.key}
+                              className="flex items-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 rounded text-xs transition-colors disabled:opacity-50">
+                              <Package size={11} /> {pkg.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
+
+                {certificate && certificate.report_id === selectedReport?.id && (
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-purple-300 font-semibold flex items-center gap-1.5"><Award size={13} /> Approval Certificate</span>
+                      <button onClick={() => setCertificate(null)} className="text-slate-500 hover:text-slate-300"><X size={13} /></button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><p className="text-slate-500">Signer</p><p className="text-slate-200">{certificate.signer || '—'}</p></div>
+                      <div><p className="text-slate-500">Role</p><p className="text-slate-200 capitalize">{certificate.signer_role?.replace(/_/g, ' ') || '—'}</p></div>
+                      <div><p className="text-slate-500">Approved At</p><p className="text-slate-200">{certificate.approved_at ? new Date(certificate.approved_at).toLocaleString() : '—'}</p></div>
+                      <div><p className="text-slate-500">Algorithm</p><p className="text-slate-200">{certificate.algorithm}</p></div>
+                    </div>
+                    <div><p className="text-slate-500 mb-0.5">Certificate Hash</p><p className="font-mono text-slate-400 break-all">{certificate.certificate_hash}</p></div>
+                    <p className="text-green-400">✓ Verified</p>
+                  </div>
+                )}
 
                 {selectedReport.reviewer_comments && (
                   <div className="bg-slate-800/30 rounded-lg border border-slate-600 p-3">
@@ -389,6 +598,14 @@ export default function CaseDetail({ caseData, onBack }) {
             )}
           </div>
         </div>
+      )}
+
+      {showLabels && evidence.length > 0 && (
+        <EvidenceLabelModal caseId={caseData.id} evidence={evidence} onClose={() => setShowLabels(false)} />
+      )}
+
+      {redactingReport && (
+        <RedactionModal caseId={caseData.id} report={redactingReport} onClose={() => setRedactingReport(null)} />
       )}
 
       {/* OCR Preview Modal */}

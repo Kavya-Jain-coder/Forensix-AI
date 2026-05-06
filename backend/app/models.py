@@ -92,6 +92,7 @@ class User(Base):
 
     cases = relationship("Case", foreign_keys="Case.assigned_officer_id", back_populates="assigned_officer")
     audit_logs = relationship("AuditLog", back_populates="user")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
 
 class Case(Base):
@@ -205,3 +206,34 @@ class AuditLog(Base):
 
     user = relationship("User", back_populates="audit_logs")
     case = relationship("Case", back_populates="audit_logs")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    level = Column(String(20), nullable=False, default="info")
+    read = Column(Boolean, default=False, nullable=False)
+    dedupe_key = Column(String(255), nullable=True, index=True)
+    case_id = Column(String, ForeignKey("cases.id"), nullable=True)
+    report_id = Column(String, ForeignKey("reports.id"), nullable=True)
+    evidence_id = Column(String, ForeignKey("evidence.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="notifications")
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+    id = Column(String, primary_key=True, default=gen_id)
+    case_id = Column(String, ForeignKey("cases.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    done = Column(Boolean, default=False, nullable=False)
+    assigned_to_id = Column(String, ForeignKey("users.id"), nullable=True)
+    created_by_id = Column(String, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    case = relationship("Case")
+    assigned_to = relationship("User", foreign_keys=[assigned_to_id])
+    created_by = relationship("User", foreign_keys=[created_by_id])

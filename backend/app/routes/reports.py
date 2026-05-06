@@ -7,6 +7,7 @@ from app.auth import get_current_user, require_roles, log_action, get_client_ip
 from app.services.generator import ReportGenerator
 from app.services.rag_service import RAGService
 from app.services.pdf_export import generate_pdf
+from app.routes.forensic import push_notification
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone
@@ -196,6 +197,22 @@ async def submit_for_review(
     db.commit()
     log_action(db, AuditAction.REPORT_SUBMITTED, user_id=current_user.id,
                case_id=case_id, report_id=report_id, ip=get_client_ip(request))
+
+    # Notify all reviewers and admins
+    reviewers = db.query(User).filter(
+        User.role.in_([UserRole.REVIEWER, UserRole.ADMIN]), User.is_active == True
+    ).all()
+    case = db.query(Case).filter(Case.id == case_id).first()
+    for u in reviewers:
+        push_notification(
+            db,
+            u.id,
+            f"Report {report.report_number} submitted for review on case {case.case_number if case else case_id}.",
+            level="info",
+            case_id=case_id,
+            report_id=report.id,
+        )
+
     return {"message": "Report submitted for review", "status": report.status}
 
 
@@ -243,6 +260,18 @@ async def review_report(
     log_action(db, audit_action, user_id=current_user.id,
                case_id=case_id, report_id=report_id,
                details={"comments": comments, "outcome": outcome}, ip=get_client_ip(request))
+
+    # Notify the report author
+    push_notification(
+        db,
+        report.generated_by_id,
+        f"Report {report.report_number} has been {'approved ✓' if action == 'approve' else 'rejected — corrections needed'}."
+        + (f" Comment: {comments}" if comments else ""),
+        level="success" if action == "approve" else "warning",
+        case_id=case_id,
+        report_id=report.id,
+    )
+
     return {"message": f"Report {action}d", "status": report.status}
 
 

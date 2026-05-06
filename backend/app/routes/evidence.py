@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import Evidence, ChainOfCustody, Case, UserRole, AuditAction, User
 from app.auth import get_current_user, require_roles, log_action, get_client_ip
 from app.services.processor import DocumentProcessor
+from app.routes.forensic import push_notification
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -246,6 +247,21 @@ async def verify_integrity(
                    details={"status": "FILE_MISSING", "storage_path": ev.storage_path},
                    ip=get_client_ip(request))
         db.commit()
+        # Notify case owner and admins about missing file
+        case = db.query(Case).filter(Case.id == case_id).first()
+        recipients = db.query(User).filter(
+            User.role.in_([UserRole.ADMIN, UserRole.FORENSIC_OFFICER]), User.is_active == True
+        ).all()
+        for u in recipients:
+            push_notification(
+                db,
+                u.id,
+                f"CRITICAL: Evidence file missing for exhibit {ev.exhibit_ref} on case {case.case_number if case else case_id}.",
+                level="error",
+                case_id=case_id,
+                evidence_id=ev.id,
+                dedupe_key=f"evidence-missing:{ev.id}:{u.id}",
+            )
         return {"status": "FILE_MISSING", "message": "CRITICAL: Original file not found on disk. This has been logged.", "match": False}
 
     current_hash = compute_sha256(ev.storage_path)
@@ -267,6 +283,23 @@ async def verify_integrity(
                details={"status": status, "expected": ev.sha256_hash, "actual": current_hash},
                ip=get_client_ip(request))
     db.commit()
+
+    # Notify on tamper or missing
+    if not match:
+        case = db.query(Case).filter(Case.id == case_id).first()
+        recipients = db.query(User).filter(
+            User.role.in_([UserRole.ADMIN, UserRole.FORENSIC_OFFICER]), User.is_active == True
+        ).all()
+        for u in recipients:
+            push_notification(
+                db,
+                u.id,
+                f"WARNING: Integrity check FAILED for exhibit {ev.exhibit_ref} on case {case.case_number if case else case_id}. Hash mismatch detected.",
+                level="error",
+                case_id=case_id,
+                evidence_id=ev.id,
+                dedupe_key=f"evidence-tampered:{ev.id}:{u.id}",
+            )
 
     return {
         "status": status,

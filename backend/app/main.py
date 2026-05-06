@@ -1,12 +1,20 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import os, sys
+_secret = os.getenv("SECRET_KEY", "")
+if not _secret:
+    print("[FATAL] SECRET_KEY is not set in .env. Refusing to start.", file=sys.stderr)
+    sys.exit(1)
+if _secret == "forensix-secret-change-in-production-32chars":
+    print("[WARNING] Using default SECRET_KEY. Change it in .env before deploying.", file=sys.stderr)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine
 from app import models
 from app.routes import auth, cases, evidence, reports, audit
-from app.routes import api
+from app.routes import api, forensic
 import os
 
 models.Base.metadata.create_all(bind=engine)
@@ -55,6 +63,7 @@ app.include_router(cases.router, prefix="/api")
 app.include_router(evidence.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
+app.include_router(forensic.router, prefix="/api")
 app.include_router(api.router, prefix="/api")  # legacy
 
 if __name__ == "__main__":
